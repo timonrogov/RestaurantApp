@@ -1,0 +1,318 @@
+/* dish-reviews.css */
+.dish-info {
+  text-align: center;
+  background-color: var(--color0);
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin-bottom: 2rem;
+  max-width: 800px;
+  margin: 2rem auto;
+}
+
+.dish-image {
+  width: 500px;
+  height: auto;
+  object-fit: cover;
+  border-radius: 12px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.rating-summary {
+  margin: 1rem 0;
+  font-size: 1.2rem;
+  color: var(--color4);
+}
+
+/* Форма отзыва */
+.review-form {
+  background-color: var(--color0);
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin: 2rem auto;
+  max-width: 800px;
+}
+
+.review-form h2 {
+  color: var(--color4);
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.rating-input {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.stars {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.stars i {
+  font-size: 2rem;
+  cursor: pointer;
+  color: var(--color2);
+  transition: all 0.2s;
+}
+
+.stars i:hover,
+.stars i.active {
+  color: var(--color3);
+  transform: scale(1.1);
+}
+
+textarea {
+  width: 95%;
+  padding: 1rem;
+  border: 2px solid var(--color1);
+  border-radius: 8px;
+  resize: vertical;
+  min-height: 120px;
+  margin-bottom: 1.5rem;
+  transition: border-color 0.3s;
+}
+
+textarea:focus {
+  border-color: var(--color3);
+  outline: none;
+}
+
+.review-form button {
+  width: 100%;
+  padding: 1rem;
+  font-size: 1.1rem;
+}
+
+.review-form button:hover {
+  background: var(--color3);
+}
+
+/* Список отзывов */
+.reviews-list {
+  max-width: 800px;
+  margin: 2rem auto;
+}
+
+.review-item {
+  background-color: var(--color0);
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 1.5rem;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.review-item:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+}
+
+.review-rating {
+  margin-bottom: 1rem;
+}
+
+.review-rating i {
+  color: var(--color3);
+}
+
+.review-author {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color4);
+  font-size: 0.9rem;
+}
+
+.review-author::before {
+  content: "—";
+  margin-right: 0.5rem;
+}
+
+/* Анимация появления отзывов */
+.review-item {
+  opacity: 0;
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+.review-item .stars i {
+  pointer-events: none; /* Блокирует любые взаимодействия */
+  cursor: default !important; /* Курсор по умолчанию */
+}
+
+.review-item .stars i:hover {
+  transform: none !important;
+  color: inherit !important;
+}
+
+@keyframes fadeIn {
+  to {
+    opacity: 1;
+  }
+}
+
+/* Задержка для каждого отзыва */
+.review-item:nth-child(1) { animation-delay: 0.1s; }
+.review-item:nth-child(2) { animation-delay: 0.3s; }
+.review-item:nth-child(3) { animation-delay: 0.5s; }
+
+.composition {
+  background: var(--color1); /* #e1c9ad */
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin: 2rem auto;
+  max-width: 600px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  position: relative;
+  overflow: hidden;
+  perspective: 1000px;
+}
+
+.composition::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: var(--color3); /* #9f5727 */
+}
+
+.composition h3 {
+  color: var(--color5); /* #482813 */
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--color3);
+  display: inline-block;
+  margin-top: 0;
+}
+
+.composition h3::after {
+  content: "";
+  display: block;
+  width: 60px;
+  height: 3px;
+  background: var(--color3);
+  margin-top: 0.5rem;
+  animation: underlineGrow 0.5s ease-out;
+}
+
+@keyframes underlineGrow {
+  from { width: 0; }
+  to { width: 60px; }
+}
+
+.composition ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.8rem;
+}
+
+.composition li {
+  position: relative;
+  padding: 0.8rem 1rem 0.8rem 2rem;
+  background: var(--color0);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  color: var(--color5);
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/*.composition li::before {
+  content: "•";
+  position: absolute;
+  left: 1rem;
+  color: var(--color3);
+  font-size: 1.2rem;
+  line-height: 1;
+}*/
+
+.composition li:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  background: var(--color0);
+}
+
+.composition li::before {
+  content: "";
+  width: 16px;
+  height: 16px;
+  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%239F5727"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>');
+  left: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* Для мобильной адаптации */
+@media (max-width: 480px) {
+  .composition ul {
+    grid-template-columns: 1fr;
+  }
+
+  .composition li {
+    padding: 0.6rem 1rem 0.6rem 1.8rem;
+  }
+}
+
+
+.weight-info {
+  margin: 1.5rem 0;
+  padding: 1.2rem;
+  background: rgba(232, 217, 202, 0.2); /* Полупрозрачный фон цвета #e1c9ad */
+  border: 2px solid var(--color1);
+  border-radius: 10px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Центрирующий контейнер */
+.weight-container {
+  display: flex;
+  justify-content: center;
+  margin: 2rem 0;
+}
+
+.weight-info {
+  width: fit-content; /* Ширина по содержимому */
+  padding: 1.5rem 3rem;
+  text-align: center; /* Выравнивание текста по центру */
+
+  /* Существующие стили */
+  background: rgba(232, 217, 202, 0.2);
+  border: 2px solid var(--color1);
+  border-radius: 10px;
+  position: relative;
+}
+
+/* Декоративные элементы */
+.weight-info::before {
+  content: "⚖️";
+  position: absolute;
+  left: -20px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 2rem;
+  opacity: 0.3;
+}
+
+.weight-info::after {
+  content: "";
+  position: absolute;
+  right: -20px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  background: var(--color3);
+  opacity: 0.1;
+  border-radius: 50%;
+}

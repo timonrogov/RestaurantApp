@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <!-- Favicon -->
+    <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+
+    <meta charset="UTF-8">
+    <title>Ресторан</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+    <link rel="stylesheet" th:href="@{/css/common.css}">
+    <link rel="stylesheet" th:href="@{/css/index.css}">
+</head>
+<body>
+<!-- Вставляем шапку -->
+<div th:replace="fragments/header :: header"></div>
+
+<div class="main-container">
+    <div class="restaurant-title">Бобр и Точка!</div>
+    <img src="/images/logo2.jpg" alt="Логотип ресторана" class="restaurant-logo">
+    <h1>Добро пожаловать в наш ресторан!</h1>
+    <p>Время работы:</p>
+    <p>Без выходных с 9:00 до 21:00</p>
+    <a th:href="@{/menu}" class="menu-link">Посмотреть меню</a>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+<script th:src="@{/js/common.js}"></script>
+<script th:src="@{/js/index.js}"></script>
+</body>
+</html>

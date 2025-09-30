@@ -1,0 +1,82 @@
+.main-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+    background-color: var(--color1);
+}
+
+h1 {
+    font-size: 2.5rem;
+    color: var(--color5);
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+.order-info {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.order-info p {
+    font-size: 1.2rem;
+    color: var(--color5);
+    margin: 0.5rem 0;
+}
+
+.order-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
+}
+
+.order-item {
+    background-color: var(--color1);
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    padding: 1.5rem;
+    width: 300px;
+    text-align: center;
+}
+
+.dish-image {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    border-radius: 10px;
+    margin-bottom: 1rem;
+}
+
+.dish-info h3 {
+    font-size: 1.5rem;
+    color: var(--color5);
+    margin-bottom: 0.5rem;
+}
+
+.dish-info p {
+    font-size: 1rem;
+    color: var(--color5);
+    margin: 0.3rem 0;
+}
+
+.original-price {
+    text-decoration: line-through;
+    color: var(--color3);
+}
+
+.total-price {
+    text-align: center;
+    margin: 2rem 0;
+}
+
+.total-price p {
+    font-size: 2rem;
+    color: var(--color5);
+    font-weight: bold;
+}
+
+.back-to-orders {
+    display: block;
+    text-align: center;
+    margin-top: 2rem;
+}

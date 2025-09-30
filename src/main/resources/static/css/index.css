@@ -1,0 +1,90 @@
+/* index.css */
+
+/* Подключаем шрифт Lobster */
+@import url('https://fonts.googleapis.com/css2?family=Lobster&display=swap');
+
+/* Стили для основного контейнера */
+.main-container {
+    text-align: center;
+    padding: 2rem;
+    background-color: var(--color1);
+}
+
+/* Стили для названия ресторана */
+.restaurant-title {
+    font-family: 'Lobster', cursive;
+    font-size: 4rem;
+    color: var(--color4);
+    margin-bottom: 0rem;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1); /* Лёгкая тень для объёма */
+}
+
+/* Стили для изображения */
+.restaurant-logo {
+    width: 500px;
+    height: auto;
+    margin-bottom: 0.5rem;
+    border-radius: 10px; /* Закругленные углы */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); /* Тень для глубины */
+}
+
+/* Стили для заголовка */
+h1 {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    margin-top: 0.5rem;
+}
+
+/* Стили для текста */
+p {
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+}
+
+/* Стили для ссылки на меню */
+.menu-link {
+    display: inline-block;
+    padding: 0.8rem 1.5rem;
+    background-color: var(--color3); /* Тёплый оранжевый цвет */
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    transition: all 0.3s ease; /* Плавные эффекты */
+    font-size: 1.2rem;
+    margin-top: 1rem;
+}
+
+.menu-link:hover {
+    background-color: var(--color4); /* Более тёмный оттенок при наведении */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px); /* Лёгкий подъём */
+}
+
+.toast-custom.toast-error {
+    background-color: var(--error);
+    color: white;
+}
+
+/* Адаптивность для мобильных устройств */
+@media (max-width: 768px) {
+    .restaurant-title {
+        font-size: 3rem;
+    }
+
+    .restaurant-logo {
+        width: 200px;
+    }
+
+    h1 {
+        font-size: 2rem;
+    }
+
+    p {
+        font-size: 1rem;
+    }
+
+    .menu-link {
+        font-size: 1rem;
+        padding: 0.6rem 1.2rem;
+    }
+}

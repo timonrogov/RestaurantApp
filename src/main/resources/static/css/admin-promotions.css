@@ -1,0 +1,97 @@
+/* admin-promotions.css */
+.promotion-card {
+    background: var(--color0);
+    border: 2px solid var(--color2);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+    display: flex;
+    gap: 2rem;
+    align-items: center;
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.promotion-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+    border-color: var(--color3);
+}
+
+.promotion-image {
+    width: 180px;
+    height: 120px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 2px solid var(--color2);
+}
+
+.promotion-info {
+    flex-grow: 1;
+    color: var(--color5);
+}
+
+.promotion-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--color1);
+}
+
+.promotion-header h2 {
+    color: var(--color4);
+    margin: 0;
+    font-size: 1.5rem;
+}
+
+.discount-badge {
+    background: var(--success);
+    color: var(--color0);
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.promotion-details p {
+    margin: 0.8rem 0;
+    font-size: 0.95rem;
+}
+
+.promotion-details span {
+    font-weight: 500;
+    color: var(--color4);
+}
+
+.btn-danger {
+    background: var(--error) !important;
+    color: var(--color0) !important;
+    padding: 0.8rem 1.5rem;
+    border-radius: 8px;
+    border: 2px solid var(--error);
+    transition: all 0.3s ease;
+    align-self: flex-start;
+}
+
+.btn-danger:hover {
+    background: var(--color0) !important;
+    color: var(--error) !important;
+    transform: translateY(-2px);
+}
+
+.btn-primary {
+    background: var(--color4);
+    color: var(--color0);
+    padding: 1rem 2rem;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    background: var(--color3);
+    transform: translateY(-2px);
+}

@@ -1,0 +1,34 @@
+<!-- account.html -->
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <!-- Favicon -->
+  <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+
+  <title>Аккаунт</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+  <link rel="stylesheet" th:href="@{/css/common.css}">
+  <link rel="stylesheet" th:href="@{/css/account.css}">
+</head>
+<body>
+<div th:replace="fragments/header :: header"></div>
+
+<h1>Ваш аккаунт</h1>
+<div th:if="${client != null}">
+  <p>Логин: <span th:text="${client.account.username}"></span></p>
+  <p>ФИО: <span th:text="${client.fullName}"></span></p>
+  <p>Телефон: <span th:text="${client.phone}"></span></p>
+  <p>Email: <span th:text="${client.email}"></span></p>
+  <p>Пол: <span th:text="${client.gender}"></span></p>
+  <p>Дата рождения: <span th:text="${#temporals.format(client.dateOfBirth, 'dd.MM.yyyy')}"></span></p>
+</div>
+<div th:if="${client == null}">
+  <p>Аккаунт не найден.</p>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+<script th:src="@{/js/common.js}"></script>
+<script th:src="@{/js/account.js}"></script>
+</body>
+</html>

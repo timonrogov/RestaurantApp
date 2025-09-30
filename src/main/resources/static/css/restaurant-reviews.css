@@ -1,0 +1,173 @@
+/* Общие стили */
+.container {
+  max-width: 800px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+h1 {
+  color: var(--color5);
+  text-align: center;
+  margin-bottom: 2rem;
+  font-size: 2.2rem;
+}
+
+/* Блок общего рейтинга */
+.rating-summary {
+  background: var(--color1);
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin: 2rem 0;
+  text-align: center;
+}
+
+.rating-summary .stars {
+  justify-content: center;
+  margin-bottom: 0.5rem;
+}
+
+.rating-summary .stars i {
+  font-size: 1.8rem;
+  color: var(--color3);
+}
+
+.rating-summary span {
+  font-size: 1.2rem;
+  color: var(--color5);
+  font-weight: 500;
+}
+
+/* Форма отзыва */
+#reviewForm {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin: 2rem 0;
+}
+
+.rating-input {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.rating-input .stars {
+  display: flex;
+  gap: 0.8rem;
+}
+
+.rating-input .stars i {
+  font-size: 2.2rem;
+  cursor: pointer;
+  color: var(--color2);
+  transition: all 0.2s;
+}
+
+.rating-input .stars i:hover,
+.rating-input .stars i.active {
+  color: var(--color3);
+  transform: scale(1.1);
+}
+
+textarea {
+  width: 95%;
+  padding: 1rem;
+  border: 2px solid var(--color1);
+  border-radius: 8px;
+  resize: vertical;
+  min-height: 120px;
+  margin: 1rem 0;
+  font-size: 1rem;
+}
+
+button[type="submit"] {
+  background: var(--color4);
+  color: white;
+  width: 100%;
+  padding: 1rem;
+  font-size: 1.1rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+button[type="submit"]:hover {
+  background: var(--color3);
+}
+
+/* Список отзывов */
+.reviews-list {
+  margin-top: 2rem;
+}
+
+.review-item {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 1.5rem;
+  transition: transform 0.3s;
+}
+
+.review-item:hover {
+  transform: translateY(-3px);
+}
+
+.review-rating {
+  margin-bottom: 1rem;
+}
+
+.review-rating i {
+  color: var(--color3);
+  font-size: 1.2rem;
+}
+
+.review-item p {
+  color: var(--color5);
+  line-height: 1.6;
+  margin-bottom: 0.8rem;
+}
+
+.review-item small {
+  color: var(--color2);
+  font-size: 0.9rem;
+  display: block;
+  text-align: right;
+}
+
+/* Анимации */
+.review-item {
+  opacity: 0;
+  animation: fadeInUp 0.5s ease-out forwards;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .container {
+    padding: 0 0.5rem;
+  }
+
+  .rating-input .stars i {
+    font-size: 1.8rem;
+  }
+
+  #reviewForm {
+    padding: 1rem;
+  }
+}

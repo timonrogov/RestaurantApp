@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <!-- Favicon -->
+  <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+
+  <title>Управление заказами</title>
+
+  <link rel="stylesheet" th:href="@{/css/common.css}">
+  <link rel="stylesheet" th:href="@{/css/admin-orders.css}">
+  <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+        integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw=="
+        crossorigin="anonymous"
+        referrerpolicy="no-referrer" />
+
+</head>
+<body>
+<div th:replace="fragments/header :: header"></div>
+  <div class="container">
+    <h1>Управление заказами</h1>
+
+    <div class="quick-filters">
+      <button th:classappend="${selectedStatus == 'Готовится'} ? 'active'"
+              onclick="location.href='/admin/orders?status='">
+        Все заказы
+      </button>
+      <button th:classappend="${selectedStatus == 'Готовится'} ? 'active'"
+              onclick="location.href='/admin/orders?status=Готовится'">
+        Активные заказы
+      </button>
+      <button th:classappend="${selectedStatus == 'Подан'} ? 'active'"
+              onclick="location.href='/admin/orders?status=Подан'">
+        Выполненные
+      </button>
+      <button th:classappend="${selectedStatus == 'Готовится'} ? 'active'"
+              onclick="location.href='/admin/orders?status=Отменен'">
+        Отмененные заказы
+      </button>
+    </div>
+
+    <div class="table-filter">
+      <input
+              type="text"
+              id="tableNumberFilter"
+              placeholder="Фильтр по номеру столика"
+              oninput="filterOrdersByTable()"
+      >
+    </div>
+
+    <div class="order-container">
+      <div th:each="order : ${orders}" class="order-card" th:attr="data-order-id=${order.id}">
+        <div class="order-header" onclick="handleOrderClick(event)">
+          <h3>Заказ #<span th:text="${order.id}"></span></h3>
+          <span class="status-badge">
+            <i class="fas fa-check-circle" th:if="${order.status.name == 'Подан'}"></i>
+            <i class="fas fa-times-circle" th:if="${order.status.name == 'Отменен'}"></i>
+            <i class="fas fa-hourglass-half" th:if="${order.status.name == 'Готовится'}"></i>
+            <span th:text="${order.status.name}"></span>
+        </span>
+        </div>
+
+        <div class="order-details">
+          <div class="detail-item">
+            <span class="detail-label">Столик</span>
+            <span
+                    class="detail-value"
+                    th:text="${order.tableNumber} ?: 'Не указан'"
+                    th:attr="data-table=${order.tableNumber} ?: ''"
+            ></span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Клиент</span>
+            <span class="detail-value" th:text="${order.client.fullName}"></span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Дата</span>
+            <span class="detail-value"
+                  th:text="${#temporals.format(order.timeSlot.day.workDate, 'dd.MM.yyyy')}"></span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Время</span>
+            <span class="detail-value"
+                  th:text="${#temporals.format(order.timeSlot.orderTime, 'HH:mm')}"></span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Сумма</span>
+            <span class="detail-value"
+                  th:text="${#numbers.formatDecimal(order.totalPrice, 0, 'COMMA', 2, 'POINT') + ' ₽'}"></span>
+          </div>
+        </div>
+
+        <div class="action-buttons" th:if="${order.status.name == 'Готовится'}">
+          <form th:action="@{/admin/orders/{id}/status(id=${order.id})}" method="post">
+            <input type="hidden" name="newStatus" value="Подан">
+            <button type="submit" class="btn btn-serve">✓ Подать</button>
+          </form>
+          <form th:action="@{/admin/orders/{id}/status(id=${order.id})}" method="post">
+            <input type="hidden" name="newStatus" value="Отменен">
+            <button type="submit" class="btn btn-cancel">✕ Отменить</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script th:src="@{/js/common.js}"></script>
+<script th:src="@{/js/admin-orders.js}"></script>
+</body>
+</html>

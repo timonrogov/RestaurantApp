@@ -1,0 +1,144 @@
+.main-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+    background-color: var(--color1);
+}
+
+h1 {
+    font-size: 2.5rem;
+    color: var(--color5);
+    margin-bottom: 2rem;
+    text-align: center;
+}
+
+.order-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
+}
+
+.order-item {
+    background-color: var(--color1);
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    padding: 1.5rem;
+    width: 300px;
+    text-align: center;
+    position: relative; /* Для привязки кнопки к низу */
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between; /* Распределяем содержимое */
+    min-height: 450px; /* Фиксируем минимальную высоту для единообразия */
+}
+
+.dish-image {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    border-radius: 10px;
+    margin-bottom: 1rem;
+}
+
+.dish-info h3 {
+    font-size: 1.5rem;
+    color: var(--color5);
+    margin-bottom: 0.5rem;
+}
+
+.dish-info p {
+    font-size: 1rem;
+    color: var(--color5);
+    margin: 0.3rem 0;
+}
+
+.comment-block {
+    margin: 1rem 0;
+    padding: 0.8rem;
+    border: 2px dashed var(--color3); /* Закругленная пунктирная рамка */
+    border-radius: 8px;
+    background-color: var(--color2); /* Легкий фон для выделения */
+}
+
+.comment-block h4 {
+    font-size: 1.1rem;
+    color: var(--color5);
+    margin-bottom: 0.5rem;
+}
+
+.comment-block p {
+    font-size: 1rem;
+    color: var(--color5);
+    margin: 0;
+}
+
+.original-price {
+    text-decoration: line-through;
+    color: var(--color3);
+}
+
+.total-price {
+    text-align: center;
+    margin: 2rem 0;
+}
+
+.total-price p {
+    font-size: 2rem;
+    color: var(--color5);
+    font-weight: bold;
+}
+
+.order-actions {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+    margin: 2rem 0;
+}
+
+.table-number-input {
+    width: 300px;
+    padding: 1rem;
+    background-color: var(--color1);
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.table-number-input label {
+    display: block;
+    font-size: 1.2rem;
+    color: var(--color5);
+    margin-bottom: 0.5rem;
+}
+
+.table-number-input input {
+    width: 100%;
+    padding: 0.8rem;
+    border: 2px solid var(--color2);
+    border-radius: 8px;
+    font-size: 1rem;
+    box-sizing: border-box;
+}
+
+.remove-item-btn {
+    background-color: var(--error);
+    margin-top: auto; /* Привязываем к низу карточки */
+    width: 100%;
+}
+
+.remove-item-btn:hover {
+    background-color: #c0392b;
+}
+
+.back-to-menu {
+    display: block;
+    text-align: center;
+    margin-top: 2rem;
+}
+
+.empty-cart {
+    text-align: center;
+    font-size: 1.5rem;
+    color: var(--color5);
+}

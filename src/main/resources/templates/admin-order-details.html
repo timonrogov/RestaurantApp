@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <!-- Favicon -->
+  <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+
+  <title>Детали заказа</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+  <link rel="stylesheet" th:href="@{/css/common.css}">
+  <link rel="stylesheet" th:href="@{/css/admin-order-details.css}">
+</head>
+<body>
+<div th:replace="fragments/header :: header"></div>
+
+<div class="container">
+  <!-- Основная информация о заказе -->
+  <h1>Заказ №<span th:text="${order.id}"></span></h1>
+  <p>Статус: <span th:text="${order.status.name}"></span></p>
+  <p>Дата и время:
+    <span th:text="${#temporals.format(order.timeSlot.day.workDate, 'dd.MM.yyyy')}"></span>
+    <span th:text="${order.timeSlot.orderTime}"></span>
+  </p>
+  <p>Номер столика: <span th:text="${order.tableNumber}"></span></p>
+
+  <!-- Информация о клиенте -->
+  <div class="client-info">
+    <h2>Информация о клиенте:</h2>
+    <p>Имя пользователя: <span th:text="${client.account.username}"></span></p>
+    <p>Полное имя: <span th:text="${client.fullName}"></span></p>
+    <p>Телефон: <span th:text="${client.phone}"></span></p>
+    <p>Email: <span th:text="${client.email}"></span></p>
+    <p>Пол: <span th:text="${client.gender}"></span></p>
+    <p>Дата рождения:
+      <span th:text="${#temporals.format(client.dateOfBirth, 'dd.MM.yyyy')}"></span>
+    </p>
+  </div>
+
+  <!-- Список блюд -->
+  <h2>Состав заказа:</h2>
+  <table class="order-items">
+    <tr>
+      <th>Изображение</th>
+      <th>Название</th>
+      <th>Количество</th>
+      <th>Комментарий</th>
+      <th>Цена</th>
+      <th>Сумма</th>
+    </tr>
+    <tr th:each="item : ${orderItems}">
+      <td>
+        <img th:src="@{${item.dish.imagePath}}"
+             alt="Фото блюда"
+             class="dish-image-small">
+      </td>
+      <td th:text="${item.dish.name}"></td>
+      <td th:text="${item.quantity}"></td>
+      <td th:text="${item.comment} ?: 'Нет комментария'"></td>
+      <td>
+                <span th:if="${item.appliedDiscount > 0}"
+                      style="text-decoration: line-through;"
+                      th:text="${#numbers.formatDecimal(item.dish.price, 0, 'COMMA', 2, 'POINT')}">
+                </span>
+        <span th:text="${#numbers.formatDecimal(item.dish.price * (1 - item.appliedDiscount), 0, 'COMMA', 2, 'POINT')}">
+                </span> ₽
+      </td>
+      <td th:text="${#numbers.formatDecimal(item.dish.price * (1 - item.appliedDiscount) * item.quantity, 0, 'COMMA', 2, 'POINT')}">
+      </td>
+    </tr>
+  </table>
+
+  <!-- Кнопки управления статусом -->
+  <div class="order-actions" th:if="${currentStatus == 'Готовится'}">
+    <form th:action="@{/admin/orders/{id}/status(id=${order.id})}" method="post">
+      <input type="hidden" name="newStatus" value="Подан">
+      <button type="submit" class="btn-success">Подать заказ</button>
+    </form>
+
+    <form th:action="@{/admin/orders/{id}/status(id=${order.id})}" method="post">
+      <input type="hidden" name="newStatus" value="Отменен">
+      <button type="submit" class="btn-danger">Отменить заказ</button>
+    </form>
+  </div>
+
+  <a href="/admin/orders" class="btn">Вернуться к списку заказов</a>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+<script th:src="@{/js/common.js}"></script>
+<script th:src="@{/js/admin-order-details.js}"></script>
+</body>
+</html>

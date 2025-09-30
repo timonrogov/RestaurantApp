@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <!-- Favicon -->
+  <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+
+  <meta charset="UTF-8">
+  <title>Новая акция</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+  <link rel="stylesheet" th:href="@{/css/common.css}">
+  <link rel="stylesheet" th:href="@{/css/new-promotion.css}">
+</head>
+<body>
+<div th:replace="fragments/header :: header"></div>
+
+<div class="container">
+  <h1>Создание новой акции</h1>
+
+  <div th:if="${error}" class="alert-error" th:text="${error}"></div>
+  <div th:if="${success}" class="alert-success" th:text="${success}"></div>
+
+  <form class="promotion-form" th:action="@{/admin/promotions/create}"
+        method="post" id="promotionForm">
+    <input type="hidden" name="_csrf" th:value="${_csrf.token}">
+
+    <!-- Выбор блюда -->
+    <div class="form-group">
+      <label>Блюдо:</label>
+      <select class="form-control" name="dish.id"
+              id="dishSelect" required
+              th:onchange="updatePrice()">
+        <option value="">Выберите блюдо</option>
+        <option th:each="dish : ${allDishes}"
+                th:value="${dish.id}"
+                th:text="${dish.name}"
+                th:data-price="${dish.price}"></option>
+      </select>
+      <div class="price-display" id="priceDisplay"></div>
+    </div>
+
+    <!-- Скидка -->
+    <div class="form-group">
+      <label>Скидка (%):</label>
+      <input type="number" class="form-control"
+             name="discountPercentage" min="1" max="100"
+             step="1" required>
+    </div>
+
+    <!-- Минимальное количество -->
+    <div class="form-group">
+      <label>Минимальное количество:</label>
+      <input type="number" class="form-control"
+             name="minQuantity" min="1" required
+             th:field="*{promotion.minQuantity}">
+    </div>
+
+    <!-- Даты -->
+    <div class="form-group">
+      <label>Дата начала:</label>
+      <input type="date" class="form-control"
+             name="startDate" required
+             th:value="${#temporals.format(timeSlot.startDate.workDate, 'yyyy-MM-dd')}">
+    </div>
+
+    <div class="form-group">
+      <label>Дата окончания:</label>
+      <input type="date" class="form-control"
+             name="endDate" required
+             th:value="${#temporals.format(timeSlot.endDate.workDate, 'yyyy-MM-dd')}">
+    </div>
+
+    <!-- Время -->
+    <div class="form-group">
+      <label>Время начала:</label>
+      <input type="time" class="form-control"
+             name="startTime" required
+             th:value="${#temporals.format(timeSlot.startTime, 'HH:mm')}">
+    </div>
+
+    <div class="form-group">
+      <label>Время окончания:</label>
+      <input type="time" class="form-control"
+             name="endTime" required
+             th:value="${#temporals.format(timeSlot.endTime, 'HH:mm')}">
+    </div>
+
+    <button type="submit" class="btn-primary">Добавить акцию</button>
+  </form>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+<script th:src="@{/js/common.js}"></script>
+<script th:src="@{/js/new-promotion.js}"></script>
+</body>
+</html>

@@ -1,0 +1,117 @@
+.main-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+h1 {
+    font-size: 2.5rem;
+    margin-bottom: 2rem;
+    text-align: center;
+}
+
+/* Контейнер для кнопок */
+.quick-filters {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 2rem;
+    flex-wrap: wrap; /* Чтобы на мобильных переносились */
+}
+
+/* Стиль кнопки-вкладки */
+.filter-tab {
+    padding: 0.8rem 1.5rem;
+    border: 2px solid var(--color3);
+    border-radius: 25px; /* Закругленные края */
+    color: var(--color5);
+    text-decoration: none;
+    font-weight: 500;
+    background-color: transparent;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+/* Эффект при наведении */
+.filter-tab:hover {
+    background-color: rgba(159, 87, 39, 0.1); /* Легкий оттенок color3 */
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+/* Активная кнопка (выбранный фильтр) */
+.filter-tab.active {
+    background-color: var(--color3);
+    color: var(--color0); /* Белый текст */
+    box-shadow: 0 4px 12px rgba(159, 87, 39, 0.3);
+}
+
+/* Адаптивность */
+@media (max-width: 480px) {
+    .filter-tab {
+        padding: 0.6rem 1rem;
+        font-size: 0.9rem;
+        flex: 1 1 auto; /* Растягивать кнопки */
+        text-align: center;
+    }
+}
+
+.filter-btn:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.orders-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.order-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: var(--color2);
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    padding: 1.5rem;
+}
+
+.order-info p {
+    margin: 0.5rem 0;
+    font-size: 1.1rem;
+}
+
+.order-info .status {
+    font-weight: bold;
+    color: var(--color3); /* Цвет можно менять в зависимости от статуса */
+}
+
+.details-btn {
+    padding: 0.8rem 1.5rem;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.details-btn:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.no-orders {
+    text-align: center;
+    font-size: 1.5rem;
+}
+
+.back-to-menu {
+    display: block;
+    text-align: center;
+    margin-top: 2rem;
+    padding: 0.8rem 1.5rem;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.back-to-menu:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}

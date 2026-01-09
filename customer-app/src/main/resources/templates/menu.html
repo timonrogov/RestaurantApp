@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <!-- Favicon -->
+    <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+
+    <meta charset="UTF-8">
+    <title>Меню ресторана</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+    <link rel="stylesheet" th:href="@{/css/common.css}">
+    <link rel="stylesheet" th:href="@{/css/menu.css}">
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+          integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw=="
+          crossorigin="anonymous"
+          referrerpolicy="no-referrer" />
+
+    <!-- CSRF-токен -->
+    <meta th:name="_csrf" th:content="${_csrf.token}"/>
+    <meta th:name="_csrf_header" th:content="${_csrf.headerName}"/>
+</head>
+<body>
+<!-- Шапка -->
+<header th:replace="~{fragments/header :: header}"></header>
+
+<div class="restaurant-status" th:if="${restaurantStatus.status != 'open'}">
+    <div class="status-message" th:text="${restaurantStatus.message}"></div>
+
+    <!-- Дополнительная информация для статуса "not_opened_yet" -->
+    <div th:if="${restaurantStatus.status == 'not_opened_yet'}">
+        <p>Часы работы сегодня:
+            <span th:text="${#temporals.format(openingTime, 'HH:mm')}"></span>
+            -
+            <span th:text="${#temporals.format(closingTime, 'HH:mm')}"></span>
+        </p>
+    </div>
+</div>
+
+<div th:if="${restaurantStatus.status == 'open'}">
+    <h1>Меню</h1>
+
+    <!-- Блок акций со слайдером -->
+    <!-- Современный блок акций -->
+    <div th:if="${activePromotions != null and !activePromotions.isEmpty()}" class="promo-section">
+        <h2 class="promo-header">
+            🔥 Горячие предложения
+            <span class="pulse-emoji">⚡</span>
+        </h2>
+
+        <div class="promo-container">
+            <!-- Карточка акции -->
+            <div th:each="promo : ${activePromotions}" class="promo-card">
+
+                <!-- Бейдж скидки -->
+                <div class="promo-badge">
+                    <span th:text="'-' + ${#numbers.formatDecimal(promo.discount * 100, 0, 0)} + '%'"></span>
+                </div>
+
+                <!-- Изображение блюда (фон) -->
+                <img th:src="@{${promo.dish.imagePath}}" alt="Фото блюда" class="promo-bg-img"/>
+
+                <!-- Градиент и контент -->
+                <div class="promo-overlay">
+                    <div class="promo-content">
+                        <h3 th:text="${promo.dish.name}">Название блюда</h3>
+
+                        <!-- Условие акции -->
+                        <div class="promo-condition" th:if="${promo.minQuantity > 1}">
+                            <i class="fas fa-layer-group"></i>
+                            <span>от <span th:text="${promo.minQuantity}"></span> шт.</span>
+                        </div>
+
+                        <!-- Цена -->
+                        <div class="promo-price">
+                        <span class="old-price"
+                              th:text="${#numbers.formatDecimal(promo.dish.price, 0, 0)}"></span>
+                            <span class="new-price"
+                                  th:text="${#numbers.formatDecimal(promo.dish.price * (1 - promo.discount), 0, 0)} + ' ₽'"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ссылка-обертка для клика (опционально, можно вести к блюду) -->
+                <a th:href="'#category-' + ${promo.dish.category.id}" class="promo-link-overlay"></a>
+            </div>
+        </div>
+    </div>
+
+    <div class="search-container">
+        <input type="text" id="dishSearch" placeholder="Поиск блюд..." class="search-input">
+    </div>
+
+    <!-- Навигация по категориям -->
+    <div class="category-nav-horizontal" id="categoryNav">
+        <div th:each="entry : ${dishesByCategory}" class="nav-item">
+            <a th:href="|#category-${entry.key.id}|"
+               th:text="${entry.key.name}"
+               class="category-link"></a>
+        </div>
+    </div>
+
+
+    <!-- Список категорий с блюдами -->
+    <div th:each="entry : ${dishesByCategory}">
+        <div class="category-section">
+            <h2 class="category-title"
+                th:id="|category-${entry.key.id}|"
+                th:text="${entry.key.name}"></h2>
+            <div class="dishes-grid">
+                <div th:each="dish : ${entry.value}"
+                     class="dish-item"
+                     th:data-is-available="${dish.isAvailable}"
+
+                     th:with="promo=${dish.activePromotions.isEmpty() ? null : dish.activePromotions.get(0)}"
+
+                     th:data-base-price="${dish.price}"
+                     th:data-has-promo="${promo != null}"
+                     th:data-min-qty="${promo != null ? promo.minQuantity : 0}"
+                     th:data-discount="${promo != null ? promo.discount : 0}">
+                    <h3 th:text="${dish.name}"></h3>
+
+                    <!-- Изображение -->
+                    <img th:if="${dish.imagePath != null}"
+                         th:src="@{${dish.imagePath}}"
+                         alt="Фото блюда"
+                         class="dish-image clickable-image"
+                         th:data-reviews-url="@{/dish/{id}/reviews(id=${dish.id})}"/>
+                    <img th:unless="${dish.imagePath != null}"
+                         th:src="@{/static/images/placeholder.jpg}"
+                         alt="Фото блюда"
+                         class="dish-image clickable-image"
+                         th:data-reviews-url="@{/dish/{id}/reviews(id=${dish.id})}"/>
+
+                    <!-- Общий контейнер для описания и рейтинга -->
+                    <div class="description-rating-container">
+                        <!-- Блок описания -->
+                        <div class="dish-description">
+                            <p th:text="${dish.description}"></p>
+                        </div>
+
+                        <!-- Блок рейтинга -->
+                        <div class="rating-block" th:if="${dish.stats}">
+                                    <span class="star"
+                                          th:classappend="${dish.stats.reviewCount > 0} ? 'yellow' : 'gray'">★</span>
+                            <span class="rating-value"
+                                  th:text="${dish.stats.reviewCount > 0} ?
+                                                    ${#numbers.formatDecimal(dish.stats.averageRating, 1, 1)} : '0.0'"></span>
+                            <span class="review-count" th:text="'(' + ${dish.stats.reviewCount} + ')'"></span>
+                        </div>
+                    </div>
+
+                    <!-- Блок цены -->
+                    <div class="price-block">
+                        <!-- БЛОК 1: Обычная цена (Виден, если условия акции НЕ выполнены) -->
+                        <div class="regular-price-view"
+                             th:style="${promo != null and promo.minQuantity <= 1} ? 'display: none;' : ''">
+        <span class="regular-price"
+              th:text="${#numbers.formatDecimal(dish.price, 1, 2)}"></span>
+                        </div>
+
+                        <!-- БЛОК 2: Цена со скидкой (Виден, если условия акции выполнены) -->
+                        <div class="discount-price-view"
+                             th:style="${promo != null and promo.minQuantity <= 1} ? '' : 'display: none;'">
+
+        <span class="original-price"
+              th:text="${#numbers.formatDecimal(dish.price, 1, 2)}"></span>
+
+                            <span class="discounted-price"
+                                  th:text="${promo != null} ? ${#numbers.formatDecimal(dish.price * (1 - promo.discount), 1, 2)} : ''"></span>
+                        </div>
+
+                        <!-- Информация о скидке (текст) -->
+                        <div th:if="${promo != null}" class="promo-info-text">
+                            <p class="discount-info" th:if="${promo.minQuantity > 1}">
+                                При заказе от <span th:text="${promo.minQuantity}"></span> шт.
+                                скидка <span th:text="${#numbers.formatDecimal(promo.discount * 100, 0, 0)}"></span>%!
+                            </p>
+                            <p class="discount-info" th:if="${promo.minQuantity <= 1}">
+                                Скидка <span th:text="${#numbers.formatDecimal(promo.discount * 100, 0, 0)}"></span>%!
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Форма добавления -->
+                    <form class="add-to-order-form">
+                        <input type="hidden" name="dishId" th:value="${dish.id}" />
+
+                        <textarea name="comment" placeholder="Ваш комментарий..."></textarea>
+
+                        <div class="controls-row">
+                            <div class="quantity-group">
+                                <label>Количество</label>
+                                <input type="number" name="quantity" min="1" max="10" value="1" class="quantity-input" />
+                            </div>
+                            <button type="button" class="add-to-order-btn">
+                                <i class="fas fa-cart-plus"></i>
+                                Добавить в заказ
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Блок с суммой и кнопкой -->
+
+    <!-- 1. Используем th:style, чтобы скрыть/показать блок на основе hasItems -->
+    <div class="order-summary"
+         th:style="${hasItems} ? 'display: flex;' : 'display: none;'">
+
+        <!-- 2. Наполняем блок контентом, если корзина не пуста -->
+        <div class="order-summary-content" th:if="${hasItems}">
+
+            <div class="order-price">
+                <!-- Если есть скидка -->
+                <th:block th:if="${hasDiscount}">
+                    <span class="original" th:text="${#numbers.formatDecimal(totalPrice, 1, 2) + ' ₽'}"></span>
+                    <span class="discounted" th:text="${#numbers.formatDecimal(totalDiscounted, 1, 2) + ' ₽'}"></span>
+                </th:block>
+
+                <!-- Если скидки нет -->
+                <th:block th:unless="${hasDiscount}">
+                    <span class="discounted" th:text="${#numbers.formatDecimal(totalDiscounted, 1, 2) + ' ₽'}"></span>
+                </th:block>
+            </div>
+
+            <a href="/orders/view" class="btn btn-primary">Перейти к заказу</a>
+        </div>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+<script th:src="@{/js/common.js}"></script>
+<script th:src="@{/js/menu.js}"></script>
+</body>
+</html>

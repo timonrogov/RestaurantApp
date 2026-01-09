@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <!-- Favicon -->
+  <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+
+  <title>Управление меню</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" th:href="@{/css/common.css}">
+  <link rel="stylesheet" th:href="@{/css/admin-dishes.css}">
+</head>
+<body>
+<div th:replace="fragments/header :: header"></div>
+
+<div class="container">
+    <div class="page-header">
+        <h1>Управление меню</h1>
+        <a th:href="@{/admin/dishes/new}" class="btn btn-add">
+            <i class="fas fa-plus"></i> Новое блюдо
+        </a>
+    </div>
+
+  <table class="dishes-table">
+    <thead>
+    <tr>
+      <th>Фото</th>
+      <th>Название</th>
+      <th>Описание</th>
+      <th>Категория</th>
+      <th>Цена</th>
+      <th>Статус</th>
+      <th>Действие</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr th:each="dish : ${dishes}">
+      <td>
+        <img th:if="${dish.imagePath != null}"
+             th:src="@{${dish.imagePath}}"
+             class="dish-image"
+             alt="Фото блюда">
+        <img th:unless="${dish.imagePath != null}"
+             th:src="@{/images/placeholder.jpg}"
+             class="dish-image"
+             alt="Фото блюда">
+      </td>
+      <td th:text="${dish.name}"></td>
+      <td th:text="${dish.description}"></td>
+      <td th:text="${dish.category.name}"></td>
+      <td th:text="${#numbers.formatDecimal(dish.price, 1, 2)} + ' ₽'"></td>
+      <td>
+                        <span th:class="${dish.available} ? 'status-available' : 'status-unavailable'"
+                              th:text="${dish.available} ? 'Доступно' : 'Не доступно'"></span>
+      </td>
+        <td>
+            <div class="table-actions">
+                <!-- Кнопка Редактировать -->
+                <a th:href="@{/admin/dishes/edit/{id}(id=${dish.id})}" class="btn-icon btn-edit" title="Редактировать">
+                    <i class="fas fa-pencil-alt"></i>
+                </a>
+
+                <!-- Кнопка Доступности (Стоп-лист) -->
+                <form method="post" th:action="@{/admin/dishes/toggle/{id}(id=${dish.id})}">
+                    <input type="hidden" name="_csrf" th:value="${_csrf.token}"/>
+                    <button type="submit"
+                            class="btn-icon"
+                            th:classappend="${dish.available} ? 'btn-stop' : 'btn-start'"
+                            th:title="${dish.available} ? 'Убрать в стоп-лист' : 'Вернуть в меню'">
+                        <i class="fas" th:classappend="${dish.available} ? 'fa-ban' : 'fa-check'"></i>
+                    </button>
+                </form>
+
+                <!-- (Опционально) Кнопка Удалить -->
+                <form method="post" th:action="@{/admin/dishes/delete/{id}(id=${dish.id})}"
+                      onsubmit="return confirm('Вы уверены, что хотите удалить это блюдо?');">
+                    <input type="hidden" name="_csrf" th:value="${_csrf.token}"/>
+                    <button type="submit" class="btn-icon btn-delete" title="Удалить навсегда">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </form>
+            </div>
+        </td>
+    </tr>
+    </tbody>
+  </table>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+<script th:src="@{/js/common.js}"></script>
+<script th:src="@{/js/admin-dishes.js}"></script>
+</body>
+</html>

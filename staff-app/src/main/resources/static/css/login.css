@@ -1,0 +1,107 @@
+/* login.css */
+
+.login-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: var(--color1); /* Светлый фон из палитры */
+}
+
+h2 {
+    font-size: 2.5rem;
+    color: var(--color5); /* Тёмный текст */
+    margin-bottom: 0rem;
+}
+
+.login-form {
+    width: 100%;
+    max-width: 400px;
+    background: var(--color2);
+    padding: 2rem;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+label {
+    display: block;
+    font-size: 1.1rem;
+    color: var(--color5); /* Тёмный текст */
+    margin-bottom: 0.5rem;
+}
+
+input[type="text"],
+input[type="password"] {
+    width: 100%; /* Устанавливаем ширину 100% от контейнера формы */
+    max-width: 100%; /* Убираем ограничение ширины */
+    padding: 0.8rem;
+    border: 2px solid var(--color2); /* Средний оттенок из палитры */
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: border-color 0.3s ease;
+    box-sizing: border-box; /* Учитываем padding и border в ширине */
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus {
+    border-color: var(--color5); /* Более тёмный оттенок при фокусе */
+}
+
+.btn {
+    width: 100%; /* Такая же ширина, как у полей ввода */
+    padding: 0.8rem;
+    background-color: var(--color4); /* Тёмный оттенок из палитры */
+    color: var(--color1);
+    border: none;
+    border-radius: 8px;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none; /* Убираем подчеркивание для ссылки */
+    box-sizing: border-box; /* Учитываем padding и border в ширине */
+}
+
+.btn:hover {
+    background-color: var(--color3); /* Чуть светлее при наведении */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+}
+
+.register-btn {
+    margin-top: 1rem;
+    text-align: center;
+    display: block;
+    width: 100%;
+    max-width: 400px; /* Такая же максимальная ширина, как у формы */
+}
+
+.error-message {
+    background-color: #dc3545; /* Красный фон */
+    color: var(--color1);
+    padding: 0.8rem;
+    border-radius: 8px;
+    margin-top: 1rem;
+    text-align: center;
+}
+
+/* Адаптивность для мобильных устройств */
+@media (max-width: 768px) {
+    .login-container {
+        padding: 1rem;
+    }
+
+    h2 {
+        font-size: 2rem;
+    }
+
+    .login-form {
+        padding: 1.5rem;
+    }
+
+    .btn {
+        font-size: 1rem;
+    }
+}

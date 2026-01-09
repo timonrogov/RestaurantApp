@@ -1,99 +1,120 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-	<modelVersion>4.0.0</modelVersion>
-	<parent>
-		<groupId>org.springframework.boot</groupId>
-		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>3.4.2</version>
-		<relativePath/> <!-- lookup parent from repository -->
-	</parent>
-	<groupId>com.example</groupId>
-	<artifactId>restaurant</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
-	<name>restaurant</name>
-	<description>Restaurant order automation system</description>
-	<url/>
-	<licenses>
-		<license/>
-	</licenses>
-	<developers>
-		<developer/>
-	</developers>
-	<scm>
-		<connection/>
-		<developerConnection/>
-		<tag/>
-		<url/>
-	</scm>
-	<properties>
-		<java.version>19</java.version>
-	</properties>
-	<dependencies>
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-data-jpa</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-web</artifactId>
-		</dependency>
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
 
-		<dependency>
-			<groupId>org.postgresql</groupId>
-			<artifactId>postgresql</artifactId>
-			<scope>runtime</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.projectlombok</groupId>
-			<artifactId>lombok</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-test</artifactId>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-thymeleaf</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-security</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.thymeleaf.extras</groupId>
-			<artifactId>thymeleaf-extras-springsecurity6</artifactId>
-		</dependency>
-	</dependencies>
+    <!-- =============================================================== -->
+    <!-- 1. Наследование от Spring Boot Parent                          -->
+    <!-- Это основа всего проекта. Мы наследуем управление версиями     -->
+    <!-- для сотен зависимостей и стандартные настройки плагинов.        -->
+    <!-- =============================================================== -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.4.2</version> <!-- Используем твою версию -->
+        <relativePath/> <!-- lookup parent from repository -->
+    </parent>
 
-	<build>
-		<plugins>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-compiler-plugin</artifactId>
-				<configuration>
-					<annotationProcessorPaths>
-						<path>
-							<groupId>org.projectlombok</groupId>
-							<artifactId>lombok</artifactId>
-						</path>
-					</annotationProcessorPaths>
-				</configuration>
-			</plugin>
-			<plugin>
-				<groupId>org.springframework.boot</groupId>
-				<artifactId>spring-boot-maven-plugin</artifactId>
-				<configuration>
-					<excludes>
-						<exclude>
-							<groupId>org.projectlombok</groupId>
-							<artifactId>lombok</artifactId>
-						</exclude>
-					</excludes>
-				</configuration>
-			</plugin>
-		</plugins>
-	</build>
+    <!-- =============================================================== -->
+    <!-- 2. Координаты родительского проекта                            -->
+    <!-- Эти groupId и version будут унаследованы всеми дочерними модулями. -->
+    <!-- =============================================================== -->
+    <groupId>com.example</groupId>
+    <artifactId>restaurant</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+
+    <!-- =============================================================== -->
+    <!-- 3. Тип упаковки 'pom'                                          -->
+    <!-- КЛЮЧЕВОЙ ЭЛЕМЕНТ! Он говорит Maven, что этот проект является     -->
+    <!-- агрегатором (контейнером) для других модулей, а не            -->
+    <!-- самостоятельным JAR-файлом.                                    -->
+    <!-- =============================================================== -->
+    <packaging>pom</packaging>
+
+    <name>restaurant</name>
+    <description>Корневой проект для системы автоматизации ресторана</description>
+
+    <!-- =============================================================== -->
+    <!-- 4. Перечисление дочерних модулей                               -->
+    <!-- Maven будет знать, что при сборке нужно также обработать       -->
+    <!-- эти папки как модули проекта.                                  -->
+    <!-- =============================================================== -->
+    <modules>
+        <module>common-module</module>
+        <module>customer-app</module>
+        <module>staff-app</module>
+    </modules>
+
+    <!-- =============================================================== -->
+    <!-- 5. Общие свойства проекта                                      -->
+    <!-- Все дочерние модули будут использовать эту версию Java.         -->
+    <!-- =============================================================== -->
+    <properties>
+        <java.version>19</java.version>
+    </properties>
+
+    <!-- =============================================================== -->
+    <!-- 6. Управление зависимостями (Dependency Management)            -->
+    <!-- Этот блок НЕ добавляет зависимости, а только УКАЗЫВАЕТ ВЕРСИИ.  -->
+    <!-- Дочерние модули смогут объявлять зависимости без указания версии, -->
+    <!-- что гарантирует их единство во всем проекте.                   -->
+    <!-- ПРИМЕЧАНИЕ: Большинство версий уже управляется через           -->
+    <!-- spring-boot-starter-parent, поэтому этот блок может быть       -->
+    <!-- минимальным или даже пустым. Он нужен для библиотек, версии    -->
+    <!-- которых не определены в Spring Boot.                            -->
+    <!-- =============================================================== -->
+    <dependencyManagement>
+        <dependencies>
+            <!-- Здесь могли бы быть зависимости, версии которых не управляются Spring Boot -->
+            <!-- Например:
+            <dependency>
+                <groupId>some.other.library</groupId>
+                <artifactId>some-library</artifactId>
+                <version>1.2.3</version>
+            </dependency>
+            -->
+        </dependencies>
+    </dependencyManagement>
+
+
+    <!-- =============================================================== -->
+    <!-- 7. Управление плагинами (Plugin Management)                    -->
+    <!-- Аналогично dependencyManagement, этот блок задает конфигурацию -->
+    <!-- плагинов по умолчанию для всех дочерних модулей.                -->
+    <!-- =============================================================== -->
+    <build>
+        <pluginManagement>
+            <plugins>
+                <!-- Плагин Spring Boot для сборки исполняемых JAR-файлов -->
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <configuration>
+                        <excludes>
+                            <exclude>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                            </exclude>
+                        </excludes>
+                    </configuration>
+                </plugin>
+
+                <!-- Плагин компилятора с настройками для Lombok -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <configuration>
+                        <annotationProcessorPaths>
+                            <path>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                                <version>${lombok.version}</version>
+                            </path>
+                        </annotationProcessorPaths>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
 
 </project>

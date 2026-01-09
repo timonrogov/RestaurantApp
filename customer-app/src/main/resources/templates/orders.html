@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <!-- Favicon -->
+  <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+
+  <title>История заказов</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+  <link rel="stylesheet" th:href="@{/css/common.css}">
+  <link rel="stylesheet" th:href="@{/css/orders.css}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+<div th:replace="fragments/header :: header"></div>
+
+<div class="main-container">
+  <h1>Ваши заказы</h1>
+
+
+    <!-- Быстрые фильтры -->
+    <div class="quick-filters">
+        <!-- Кнопка "Все заказы" (сброс фильтра) -->
+        <a th:href="@{/orders}"
+           th:classappend="${statusFilter == null} ? 'active'"
+           class="filter-tab">
+            Все
+        </a>
+
+        <!-- Кнопка "Активные" -->
+        <!-- Теперь отправляем параметр ACTIVE -->
+        <a th:href="@{/orders(statusFilter='ACTIVE')}"
+           th:classappend="${statusFilter == 'ACTIVE'} ? 'active'"
+           class="filter-tab">
+            Активные
+        </a>
+
+        <!-- Кнопка "Выполненные" (SERVED) -->
+        <a th:href="@{/orders(statusFilter='SERVED')}"
+           th:classappend="${statusFilter == 'SERVED'} ? 'active'"
+           class="filter-tab">
+            Поданные
+        </a>
+
+        <!-- Кнопка "Отмененные" (CANCELED) -->
+        <a th:href="@{/orders(statusFilter='CANCELED')}"
+           th:classappend="${statusFilter == 'CANCELED'} ? 'active'"
+           class="filter-tab">
+            Отмененные
+        </a>
+    </div>
+
+
+
+    <!-- Список заказов -->
+  <div th:unless="${orders.isEmpty()}" class="orders-list">
+    <div th:each="order : ${orders}" class="order-card">
+      <div class="order-info">
+        <p><strong>Заказ №</strong> <span th:text="${order.id}"></span></p>
+        <p><strong>Статус:</strong> <span th:text="${order.status.getDisplayName()}" class="status"></span></p>
+        <p><strong>Дата заказа:</strong> <span th:text="${#temporals.format(order.timeSlot.day.workDate, 'dd.MM.yyyy')}"></span></p>
+        <p><strong>Время заказа:</strong> <span th:text="${#temporals.format(order.timeSlot.orderTime, 'HH:mm')}"></span></p>
+        <p><strong>Столик:</strong> <span th:text="${order.tableNumber}"></span></p>
+      </div>
+      <a th:href="@{/orders/details/{id}(id=${order.id})}" class="btn details-btn">Подробнее</a>
+    </div>
+  </div>
+
+  <!-- Сообщение, если заказов нет -->
+  <div th:if="${orders.isEmpty()}" class="no-orders">
+    <p>Не найдено заказы с таким статусом.</p>
+  </div>
+
+  <a th:href="@{/menu}" class="btn back-to-menu">Назад в меню</a>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+<script th:src="@{/js/common.js}"></script>
+<script th:src="@{/js/orders.js}"></script>
+</body>
+</html>

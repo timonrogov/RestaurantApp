@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <!-- Favicon -->
+  <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+
+  <title>Регистрация</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+  <link rel="stylesheet" th:href="@{/css/common.css}">
+  <link rel="stylesheet" th:href="@{/css/register.css}">
+</head>
+<body>
+<!-- Вставляем шапку -->
+<div th:replace="fragments/header :: header"></div>
+
+<div class="register-container">
+  <h2>Регистрация</h2>
+  <div th:if="${error}" class="error-message" th:text="${error}"></div>
+  <form th:action="@{/register}" method="post" id="registerForm" class="register-form">
+      <div class="form-group">
+          <label>Роль сотрудника:</label>
+          <select name="role">
+              <!-- th:value отправляет имя константы (ADMIN), текст показывает название -->
+              <option th:each="role : ${T(com.example.restaurant.enums.Role).values()}"
+                      th:if="${role.name() != 'CLIENT'}"
+                      th:value="${role.name()}"
+                      th:text="${role.getDisplayName()}">
+              </option>
+          </select>
+      </div>
+    <div class="form-group">
+      <label>Логин:</label>
+      <input type="text" name="username" placeholder="Логин" required />
+    </div>
+    <div class="form-group">
+      <label>Пароль:</label>
+      <input type="password" name="password" placeholder="Пароль" required />
+    </div>
+    <div class="form-group">
+      <label>Email:</label>
+      <input type="email" name="email" placeholder="Email" required />
+    </div>
+    <div class="form-group">
+      <label>Полное имя:</label>
+      <input type="text" name="fullName" placeholder="Полное имя" required />
+    </div>
+    <div class="form-group">
+      <label>Телефон:</label>
+      <input type="text" name="phone" placeholder="Телефон" />
+    </div>
+    <div class="form-group">
+      <label>Пол:</label>
+      <select name="gender" id="gender">
+        <option value="Мужской">Мужской</option>
+        <option value="Женский">Женский</option>
+        <option value="Другой">Другой</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Дата рождения:</label>
+      <input type="date" name="dateOfBirth" />
+    </div>
+    <div id="errorMessage" style="color: red; font-size: 20px; display: none;">КоАП РФ Статья 6.21. Пропаганда нетрадиционных сексуальных отношений и (или) предпочтений, смены пола, отказа от деторождения. За вами уже выехали!!!</div>
+    <div class="form-group">
+      <button type="submit" class="btn">Зарегистрировать сотрудника</button>
+    </div>
+  </form>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+<script th:src="@{/js/common.js}"></script>
+<script th:src="@{/js/register.js}"></script>
+<script>
+  $(document).ready(function() {
+    // Обработка серверной ошибки
+    const serverError = [[${error != null ? "'" + error + "'" : 'null'}]];
+    if (serverError) {
+      toastr.error(serverError, 'Ошибка регистрации', {
+        closeButton: true,
+        progressBar: true,
+        positionClass: 'toast-top-right',
+        timeOut: 5000
+      });
+    }
+
+    // Обработка выбора "Другой" в поле gender
+    $('#registerForm').on('submit', function(e) {
+      const gender = $('#gender').val();
+      if (gender === 'Другой') {
+        e.preventDefault();
+        toastr.error('КоАП РФ Статья 6.21. Пропаганда нетрадиционных сексуальных отношений и (или) предпочтений, смены пола, отказа от деторождения. За вами уже выехали!!!', 'Ошибка', {
+          closeButton: true,
+          progressBar: true,
+          positionClass: 'toast-top-right',
+          timeOut: 5000
+        });
+      }
+    });
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,240 @@
+/* call-waiter.css */
+
+/* === 1. Кнопка в шапке === */
+.call-waiter-btn {
+    background-color: transparent;
+    border: 2px solid var(--color3); /* Оранжевый акцент */
+    color: var(--color0); /* Светлый текст, как везде в шапке */
+    padding: 6px 16px;
+    border-radius: 20px; /* Округлая форма */
+    cursor: pointer;
+    font-family: 'Playfair Display', serif;
+    font-weight: 500;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+    margin-right: 20px; /* Отступ от соседних элементов */
+}
+
+/* Эффект при наведении */
+.call-waiter-btn:hover {
+    background-color: var(--color3); /* Заливка при наведении */
+    box-shadow: 0 0 12px rgba(159, 87, 39, 0.6); /* Свечение */
+    transform: translateY(-2px);
+    color: var(--color0);
+}
+
+/* Иконка колокольчика (исходное состояние) */
+.call-waiter-btn i {
+    font-size: 1.1rem;
+    transform-origin: top center; /* Точка вращения сверху (за петельку) */
+    transition: transform 0.3s ease; /* Чтобы плавно возвращался на место */
+}
+
+/* Анимация ТОЛЬКО при наведении на кнопку */
+.call-waiter-btn:hover i {
+    /* Имя анимации | длительность | метод | бесконечно пока курсор наведен */
+    animation: bell-shake 1.0s ease-in-out;
+}
+
+/* Сама анимация (немного ускорил для динамики) */
+@keyframes bell-shake {
+    0% { transform: rotate(0); }
+    15% { transform: rotate(15deg); }
+    30% { transform: rotate(-15deg); }
+    45% { transform: rotate(10deg); }
+    60% { transform: rotate(-10deg); }
+    75% { transform: rotate(5deg); }
+    85% { transform: rotate(-5deg); }
+    100% { transform: rotate(0); }
+}
+
+/* === 2. Модальное окно (Overlay) === */
+.waiter-modal-overlay {
+    display: none; /* Скрыто по умолчанию */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6); /* Затемнение фона */
+    z-index: 2000; /* Поверх шапки (у шапки обычно 1000) */
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    backdrop-filter: blur(3px); /* Размытие фона */
+}
+
+.waiter-modal-overlay.show {
+    opacity: 1;
+}
+
+/* === 3. Контент модального окна === */
+.waiter-modal-content {
+    background-color: var(--color0);
+    width: 400px;
+    max-width: 90%;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--color2);
+    transform: translateY(-20px);
+    transition: transform 0.3s ease;
+    overflow: hidden;
+}
+
+.waiter-modal-overlay.show .waiter-modal-content {
+    transform: translateY(0);
+}
+
+/* Шапка окна */
+.waiter-modal-header {
+    background-color: var(--color1);
+    padding: 1.2rem 1.5rem;
+    border-bottom: 1px solid var(--color2);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.waiter-modal-header h3 {
+    margin: 0;
+    color: var(--color5);
+    font-size: 1.3rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.waiter-modal-header h3 i {
+    color: var(--color3);
+}
+
+.close-btn {
+    font-size: 1.5rem;
+    color: var(--color4);
+    cursor: pointer;
+    transition: color 0.2s;
+    line-height: 1;
+}
+
+.close-btn:hover {
+    color: var(--error);
+}
+
+/* Тело окна */
+.waiter-modal-body {
+    padding: 2rem 1.5rem;
+    text-align: center;
+    color: var(--color5);
+}
+
+.waiter-modal-body p {
+    margin-bottom: 1.5rem;
+    font-size: 1rem;
+    line-height: 1.5;
+}
+
+/* Поле ввода номера столика */
+.waiter-input {
+    width: 100%;
+    padding: 12px;
+    font-size: 1.2rem;
+    text-align: center;
+    border: 2px solid var(--color2);
+    border-radius: 8px;
+    background-color: #fff;
+    color: var(--color5);
+    transition: border-color 0.3s;
+    box-sizing: border-box;
+}
+
+.waiter-input:focus {
+    outline: none;
+    border-color: var(--color3);
+    box-shadow: 0 0 0 3px rgba(159, 87, 39, 0.1);
+}
+
+.waiter-input::placeholder {
+    color: #ccc;
+}
+
+/* Сообщения об ошибках/успехе */
+.waiter-message {
+    margin-top: 15px;
+    font-size: 0.9rem;
+    min-height: 20px;
+}
+
+.waiter-message.error {
+    color: var(--error);
+}
+
+.waiter-message.success {
+    color: var(--success);
+    font-weight: bold;
+}
+
+/* Подвал окна (Кнопки) */
+.waiter-modal-footer {
+    padding: 1rem 1.5rem;
+    background-color: var(--color1); /* Слегка темнее фона контента */
+    border-top: 1px solid var(--color2);
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.btn-cancel-call {
+    background: transparent;
+    border: 1px solid var(--color4);
+    color: var(--color4);
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-cancel-call:hover {
+    background: rgba(104, 50, 4, 0.05);
+}
+
+.btn-confirm-call {
+    background: var(--color4); /* Темно-коричневый */
+    border: none;
+    color: var(--color0);
+    padding: 8px 20px;
+    border-radius: 6px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-confirm-call:hover {
+    background: var(--color3); /* Оранжевый при наведении */
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+/* Адаптивность для мобильных */
+@media (max-width: 576px) {
+    .call-text {
+        display: none; /* Скрываем текст "Официант", оставляем только колокольчик */
+    }
+
+    .call-waiter-btn {
+        padding: 8px; /* Делаем кнопку квадратной/круглой */
+        border-radius: 50%;
+        width: 36px;
+        height: 36px;
+        justify-content: center;
+        margin-right: 10px;
+    }
+
+    .call-waiter-btn i {
+        font-size: 1rem;
+        margin: 0;
+    }
+}

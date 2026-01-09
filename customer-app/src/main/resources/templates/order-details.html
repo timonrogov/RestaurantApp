@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <!-- Favicon -->
+  <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+
+  <title>Детали заказа</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+  <link rel="stylesheet" th:href="@{/css/common.css}">
+  <link rel="stylesheet" th:href="@{/css/order-details.css}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+<div th:replace="fragments/header :: header"></div>
+
+<div class="main-container">
+  <h1>Заказ № <span th:text="${order.id}"></span></h1>
+  <div class="order-info">
+    <p><strong>Статус:</strong> <span th:text="${order.status.getDisplayName()}"></span></p>
+    <p><strong>Дата:</strong> <span th:text="${#temporals.format(order.timeSlot.day.workDate, 'dd.MM.yyyy')}"></span></p>
+    <p><strong>Время:</strong> <span th:text="${#temporals.format(order.timeSlot.orderTime, 'HH:mm')}"></span></p>
+  </div>
+
+  <!-- Список блюд в виде карточек -->
+  <div class="order-items">
+    <div th:each="item : ${orderItems}" class="order-item">
+      <img th:if="${item.dish.imagePath != null}" th:src="@{${item.dish.imagePath}}" alt="Фото блюда" class="dish-image"/>
+      <img th:unless="${item.dish.imagePath != null}" th:src="@{/static/images/placeholder.jpg}" alt="Фото блюда" class="dish-image"/>
+      <div class="dish-info">
+        <h3 th:text="${item.dish.name}"></h3>
+        <p>Количество: <span th:text="${item.quantity}"></span></p>
+        <p th:if="${item.comment != ''}">Комментарий: <span th:text="${item.comment != null} ? ${item.comment} : 'Нет'"></span></p>
+        <p>Цена:
+          <span th:if="${item.appliedDiscount > 0}" class="original-price" th:text="${#numbers.formatDecimal(item.dish.price, 1, 2)} + ' ₽'"></span>
+          <span th:text="${#numbers.formatDecimal(item.dish.price * (1 - item.appliedDiscount), 1, 2)} + ' ₽'"></span>
+        </p>
+        <p>Сумма: <span th:text="${#numbers.formatDecimal(item.quantity * item.dish.price * (1 - item.appliedDiscount), 1, 2)} + ' ₽'"></span></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Итоговая сумма -->
+  <div class="total-price">
+    <p>Итог:
+      <span th:if="${totalDiscounted != null and totalDiscounted < totalPrice}" class="original-price" th:text="${#numbers.formatDecimal(totalPrice, 1, 2)} + ' ₽'"></span>
+      <span th:text="${#numbers.formatDecimal(totalDiscounted, 1, 2)} + ' ₽'"></span>
+    </p>
+  </div>
+
+  <a th:href="@{/orders}" class="btn back-to-orders">К заказам</a>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+<script th:src="@{/js/common.js}"></script>
+<script th:src="@{/js/order-details.js}"></script>
+</body>
+</html>

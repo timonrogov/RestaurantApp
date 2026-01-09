@@ -1,0 +1,103 @@
+<!-- fragments/header.html -->
+<header th:fragment="header"
+        xmlns:th="http://www.thymeleaf.org"
+        xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+
+    <div class="header-content">
+        <div class="header-role-content">
+
+            <!-- ЛЕВАЯ ЧАСТЬ: Логотип и Навигация -->
+            <div class="left-section" style="display: flex; align-items: center; gap: 20px;">
+
+                <!-- Логотип -->
+                <a href="/" style="text-decoration: none; display: flex; align-items: center; gap: 10px;">
+                    <img src="/images/logo3.png" alt="Логотип"
+                         style="height: 50px; width: auto; border-radius: 8px; border: 2px solid var(--color2);">
+
+                    <div style="display: flex; flex-direction: column;">
+                        <span style="font-family: 'Playfair Display', serif; font-weight: bold; font-size: 1.1rem; color: var(--color0); line-height: 1.1;">Бобр и Точка</span>
+                        <span style="font-size: 0.8rem; color: var(--color2); text-transform: uppercase; letter-spacing: 1px;">Панель персонала</span>
+                    </div>
+                </a>
+
+                <!-- Ссылки меню -->
+                <div style="display: flex; gap: 15px; margin-left: 20px;">
+                    <th:block sec:authorize="isAuthenticated()">
+                        <a th:href="@{/admin/orders}" class="nav-link">Заказы</a>
+
+                        <a th:href="@{/admin/calls}"
+                           sec:authorize="hasAnyRole('WAITER', 'ADMIN')"
+                           class="nav-link"
+                           style="position: relative;">
+                            <i class="fas fa-concierge-bell"></i> Вызовы
+
+                            <!-- Бейдж с количеством (скрыт по умолчанию, пока JS не обновит) -->
+                            <span id="callBadge" class="notification-badge" style="display: none;">0</span>
+                        </a>
+
+                        <a th:href="@{/admin/dishes}" sec:authorize="hasRole('ADMIN')" class="nav-link">Меню</a>
+                        <a th:href="@{/admin/promotions}" sec:authorize="hasRole('ADMIN')" class="nav-link">Акции</a>
+                        <a th:href="@{/admin/employees}" sec:authorize="hasRole('ADMIN')" class="nav-link">
+                            <i class="fas fa-users"></i> Сотрудники
+                        </a>
+                    </th:block>
+                </div>
+            </div>
+
+            <!-- ПРАВАЯ ЧАСТЬ: Профиль и Вход/Выход -->
+            <div class="right-section">
+
+                <div sec:authorize="isAuthenticated()" style="display: flex; align-items: center; gap: 20px;">
+
+                    <!-- ЕДИНЫЙ КЛИКАБЕЛЬНЫЙ БЛОК ПРОФИЛЯ -->
+                    <a th:href="@{/profile}" class="profile-link"
+                       style="text-decoration: none; display: flex; flex-direction: column; align-items: flex-end; line-height: 1.2; cursor: pointer;">
+
+                        <!-- Имя пользователя (Сверху) -->
+                        <span sec:authentication="name"
+                              class="profile-name"
+                              style="font-weight: bold; font-size: 1rem; color: var(--color0); transition: color 0.3s;">
+                </span>
+
+                        <!-- Роль (Снизу) -->
+                        <span style="font-size: 0.8rem; color: var(--color2);">
+                    <span sec:authorize="hasRole('ADMIN')">Администратор</span>
+                    <span sec:authorize="hasRole('COOK')">Повар</span>
+                    <span sec:authorize="hasRole('WAITER')">Официант</span>
+                </span>
+                    </a>
+
+                    <!-- Кнопка Выйти -->
+                    <form th:action="@{/logout}" method="post" class="logout-form" style="margin: 0;">
+                        <button type="submit" class="nav-link login-btn">Выйти</button>
+                    </form>
+                </div>
+
+                <div sec:authorize="!isAuthenticated()">
+                    <a th:href="@{/login}" class="nav-link login-btn">Войти</a>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Небольшой стиль для ховера на имя -->
+    <style>
+        .profile-link:hover .profile-name {
+            color: var(--color3) !important; /* Подсветка имени при наведении */
+        }
+    </style>
+
+    <!-- Подключение стилей для бейджика -->
+    <link rel="stylesheet" th:href="@{/css/admin-calls.css}">
+
+    <!-- === ПОДКЛЮЧЕНИЕ БИБЛИОТЕК === -->
+    <!-- Подключаем jQuery и Toastr здесь, чтобы они были доступны глобально и до выполнения скриптов -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+
+    <!-- Глобальный скрипт для опроса сервера о новых вызовах -->
+    <script sec:authorize="hasAnyRole('WAITER', 'ADMIN')" th:src="@{/js/staff-notifications.js}"></script>
+</header>

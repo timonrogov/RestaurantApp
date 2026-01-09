@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- =============================================================== -->
+    <!-- 1. Ссылка на родительский POM-файл                             -->
+    <!-- Этот блок связывает модуль с корневым проектом, наследуя       -->
+    <!-- общие настройки, версии зависимостей и плагины.               -->
+    <!-- =============================================================== -->
+    <parent>
+        <groupId>com.example</groupId>
+        <artifactId>restaurant</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+    </parent>
+
+    <!-- =============================================================== -->
+    <!-- 2. Координаты этого модуля                                     -->
+    <!-- groupId и version наследуются из parent.                        -->
+    <!-- artifactId - это уникальное имя данного модуля.                -->
+    <!-- =============================================================== -->
+    <artifactId>common-module</artifactId>
+    <name>common-module</name>
+    <description>Общий модуль с моделями, репозиториями и сервисами</description>
+
+    <!-- Упаковка по умолчанию - jar, что идеально для библиотеки. -->
+    <!-- <packaging>jar</packaging> -->
+
+
+    <!-- =============================================================== -->
+    <!-- 3. Зависимости, необходимые ТОЛЬКО для этого модуля            -->
+    <!-- Здесь нет зависимостей для веба (web, thymeleaf), так как      -->
+    <!-- этот модуль не является веб-приложением.                       -->
+    <!-- =============================================================== -->
+    <dependencies>
+
+        <!-- Spring Data JPA: необходим для работы с сущностями (@Entity) и репозиториями (JpaRepository) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+
+        <!-- Spring Security: нужен, так как модель Account реализует UserDetails -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
+        <!-- Драйвер для PostgreSQL: необходим для подключения к базе данных во время выполнения -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- Lombok: для автоматической генерации геттеров, сеттеров и конструкторов -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional> <!-- Делаем опциональным, чтобы не транслировался в конечные приложения -->
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-json</artifactId>
+        </dependency>
+
+        <!-- ЗАВИСИМОСТЬ ДЛЯ ВАЛИДАЦИИ DTO                                 -->
+        <!-- Добавляет Jakarta Bean Validation API и Hibernate Validator      -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- Для работы с MultipartFile и веб-утилитами -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.tomcat.embed</groupId>
+            <artifactId>tomcat-embed-core</artifactId>
+        </dependency>
+
+    </dependencies>
+
+    <!-- =============================================================== -->
+    <!-- 4. Секция Build                                                 -->
+    <!-- Для библиотечного модуля здесь НЕ НУЖЕН плагин                 -->
+    <!-- 'spring-boot-maven-plugin', так как мы не создаем              -->
+    <!-- исполняемый "fat JAR".                                         -->
+    <!-- =============================================================== -->
+    <build>
+        <plugins>
+            <!-- Этот плагин нужен для корректной работы Lombok -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <!-- Версия управляется родительским POM -->
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

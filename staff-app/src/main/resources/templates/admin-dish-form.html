@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+    <meta charset="UTF-8">
+    <title th:text="${dish.id == null} ? 'Новое блюдо' : 'Редактирование блюда'">Блюдо</title>
+
+    <!-- Подключаем общие стили и библиотеки -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" th:href="@{/css/common.css}">
+
+    <!-- Стили конкретно для этой страницы -->
+    <link rel="stylesheet" th:href="@{/css/admin-dish-form.css}">
+</head>
+<body>
+
+<!-- Шапка -->
+<div th:replace="fragments/header :: header"></div>
+
+<div class="main-container">
+
+    <div class="form-wrapper">
+        <div class="page-header">
+            <h1 th:text="${dish.id == null} ? 'Создание нового блюда' : 'Редактирование блюда'"></h1>
+            <a th:href="@{/admin/dishes}" class="btn-back">
+                <i class="fas fa-arrow-left"></i> Назад к списку
+            </a>
+        </div>
+
+        <!--
+            Важно: enctype="multipart/form-data" обязателен для загрузки файлов.
+            th:object="${dish}" связывает форму с объектом, переданным из контроллера.
+        -->
+        <form th:action="@{/admin/dishes/save}" th:object="${dish}" method="post" enctype="multipart/form-data" class="dish-form">
+
+            <!-- Скрытое поле ID (нужно для обновления существующего блюда) -->
+            <input type="hidden" th:field="*{id}">
+
+            <div class="form-grid">
+
+                <!-- ЛЕВАЯ КОЛОНКА: Изображение -->
+                <div class="image-section">
+                    <div class="image-preview-container">
+                        <!-- Предпросмотр: показываем текущее фото или заглушку -->
+                        <img id="imagePreview"
+                             th:src="*{imagePath != null} ? @{*{imagePath}} : @{/images/placeholder.jpg}"
+                             alt="Предпросмотр">
+
+                        <!-- Оверлей при наведении -->
+                        <div class="image-overlay" onclick="triggerFileInput()">
+                            <i class="fas fa-camera"></i>
+                            <span>Изменить фото</span>
+                        </div>
+                    </div>
+
+                    <!-- Скрытый инпут для файла -->
+                    <input type="file" id="imageInput" name="imageFile" accept="image/*" onchange="previewImage(this)">
+                    <p class="help-text">Нажмите на фото, чтобы загрузить новое (JPG, PNG)</p>
+                </div>
+
+                <!-- ПРАВАЯ КОЛОНКА: Поля данных -->
+                <div class="fields-section">
+
+                    <!-- Название -->
+                    <div class="form-group">
+                        <label>Название блюда</label>
+                        <input type="text" th:field="*{name}" placeholder="Например: Борщ" required>
+                    </div>
+
+                    <!-- Категория -->
+                    <div class="form-group">
+                        <label>Категория</label>
+                        <select name="categoryId" required>
+                            <option value="" disabled selected>Выберите категорию</option>
+                            <option th:each="cat : ${categories}"
+                                    th:value="${cat.id}"
+                                    th:text="${cat.name}"
+                                    th:selected="${dish.category != null and dish.category.id == cat.id}">
+                            </option>
+                        </select>
+                    </div>
+
+                    <!-- Цена и Вес (в одну строку) -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Цена (₽)</label>
+                            <input type="number" th:field="*{price}" step="0.01" min="0" required placeholder="0.00">
+                        </div>
+                        <div class="form-group">
+                            <label>Вес (г/мл)</label>
+                            <input type="number" th:field="*{weight}" min="0" required placeholder="0">
+                        </div>
+                    </div>
+
+                    <!-- Описание -->
+                    <div class="form-group">
+                        <label>Описание</label>
+                        <textarea th:field="*{description}" rows="3" placeholder="Краткое описание для меню..."></textarea>
+                    </div>
+
+                    <!-- Состав -->
+                    <div class="form-group">
+                        <label>Состав</label>
+                        <textarea th:field="*{composition}" rows="3" placeholder="Ингредиенты через запятую..."></textarea>
+                    </div>
+
+                    <!-- Кнопка сохранения -->
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-save">
+                            <i class="fas fa-save"></i> Сохранить
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Скрипты -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+<script th:src="@{/js/common.js}"></script>
+<script th:src="@{/js/admin-dish-form.js}"></script>
+
+<!-- Вывод ошибок/успеха -->
+<script th:if="${error}">
+    toastr.error([[${error}]]);
+</script>
+
+</body>
+</html>

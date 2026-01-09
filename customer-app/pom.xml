@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- =============================================================== -->
+    <!-- 1. Ссылка на родительский POM-файл                             -->
+    <!-- Наследуем общие настройки и управление версиями.                -->
+    <!-- =============================================================== -->
+    <parent>
+        <groupId>com.example</groupId>
+        <artifactId>restaurant</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+    </parent>
+
+    <!-- =============================================================== -->
+    <!-- 2. Координаты этого модуля                                     -->
+    <!-- =============================================================== -->
+    <artifactId>customer-app</artifactId>
+    <name>customer-app</name>
+    <description>Веб-приложение для клиентов ресторана</description>
+
+    <!-- Упаковка по умолчанию 'jar' подходит для Spring Boot приложения. -->
+
+
+    <!-- =============================================================== -->
+    <!-- 3. Зависимости, необходимые для клиентского приложения          -->
+    <!-- =============================================================== -->
+    <dependencies>
+
+        <!-- =========================================================== -->
+        <!-- (КЛЮЧЕВАЯ ЗАВИСИМОСТЬ) Подключаем наш общий модуль          -->
+        <!-- Это дает доступ ко всем моделям, репозиториям и общим       -->
+        <!-- сервисам из common-module.                                 -->
+        <!-- =========================================================== -->
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>common-module</artifactId>
+            <version>${project.version}</version> <!-- Версия берется из parent -->
+        </dependency>
+
+        <!-- Spring Boot Starter Web: для создания веб-приложения (контроллеры, Tomcat) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- Thymeleaf: для рендеринга HTML-страниц на сервере -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
+
+        <!-- Дополнение для интеграции Spring Security с Thymeleaf (например, для sec:authorize) -->
+        <dependency>
+            <groupId>org.thymeleaf.extras</groupId>
+            <artifactId>thymeleaf-extras-springsecurity6</artifactId>
+        </dependency>
+
+        <!-- Spring Boot Starter Security: уже есть в common-module, но лучше указать явно, -->
+        <!-- так как это веб-приложение со своей конфигурацией безопасности. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
+        <!-- Lombok: нужен для компиляции сервисов и контроллеров этого модуля -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- Зависимости для тестирования -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+
+    </dependencies>
+
+
+    <!-- =============================================================== -->
+    <!-- 4. Секция Build                                                 -->
+    <!-- Здесь мы указываем, что это запускаемое приложение.             -->
+    <!-- =============================================================== -->
+    <build>
+        <plugins>
+            <!-- =========================================================== -->
+            <!-- (КЛЮЧЕВОЙ ПЛАГИН) Spring Boot Maven Plugin                 -->
+            <!-- Этот плагин собирает все зависимости (включая common-module)-->
+            <!-- в один исполняемый "fat JAR" файл.                        -->
+            <!-- =========================================================== -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <!-- Указываем главный класс для запуска этого конкретного модуля -->
+                    <mainClass>com.example.restaurant.CustomerApplication</mainClass>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+
+            <!-- Плагин для корректной работы Lombok -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

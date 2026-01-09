@@ -1,0 +1,352 @@
+/* admin-employees.css */
+
+/* === Верхняя панель === */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    border-bottom: 2px solid var(--color2);
+    padding-bottom: 1rem;
+}
+
+.page-header h1 {
+    color: var(--color5);
+    margin: 0;
+}
+
+.btn-add {
+    background-color: var(--success); /* Или --color3, если хотите в цвет бренда */
+    color: var(--color0);
+    border: none;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0.8rem 1.5rem;
+}
+
+.btn-add:hover {
+    background-color: #218838; /* Чуть темнее success */
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.2);
+}
+
+/* === Вкладки (Tabs) === */
+.tabs-container {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+}
+
+.tab-btn {
+    padding: 0.8rem 1.5rem;
+    border: 2px solid var(--color2);
+    border-radius: 25px;
+    text-decoration: none;
+    color: var(--color5);
+    font-weight: 600;
+    background: transparent;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tab-btn:hover {
+    border-color: var(--color3);
+    color: var(--color3);
+    background: rgba(225, 201, 173, 0.1);
+}
+
+.tab-btn.active {
+    background-color: var(--color3);
+    color: var(--color0);
+    border-color: var(--color3);
+    box-shadow: 0 4px 10px rgba(159, 87, 39, 0.3);
+}
+
+/* Особый стиль для кнопки "Заблокированные" */
+.tab-btn.tab-banned {
+    margin-left: auto; /* Отодвигаем вправо */
+    border-color: var(--error);
+    color: var(--error);
+}
+
+.tab-btn.tab-banned:hover {
+    background: rgba(220, 53, 69, 0.1);
+}
+
+.tab-btn.tab-banned.active {
+    background-color: var(--error);
+    color: var(--color0);
+}
+
+/* === Сетка сотрудников === */
+.employees-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 25px;
+}
+
+.no-data {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 3rem;
+    color: var(--color2);
+    font-size: 1.2rem;
+    background: var(--color0);
+    border-radius: 12px;
+    border: 2px dashed var(--color2);
+}
+
+/* === Карточка сотрудника === */
+.employee-card {
+    background-color: var(--color0);
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    border: 1px solid var(--color1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.employee-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    border-color: var(--color2);
+}
+
+/* Шапка карточки */
+.card-header {
+    padding: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 1px solid var(--color1);
+    background: rgba(238, 226, 214, 0.2); /* Легкий оттенок color1 */
+}
+
+/* Бейджи ролей */
+.role-badge {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.role-admin {
+    background-color: var(--color4);
+    color: var(--color0);
+}
+
+.role-cook {
+    background-color: var(--color3);
+    color: var(--color0);
+}
+
+.role-waiter {
+    background-color: var(--color2);
+    color: var(--color5);
+}
+
+/* Аватар */
+.avatar-circle {
+    width: 50px;
+    height: 50px;
+    background-color: var(--color2);
+    color: var(--color5);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: bold;
+    border: 2px solid var(--color0);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+/* Тело карточки */
+.card-body {
+    padding: 1.5rem;
+    flex-grow: 1;
+}
+
+.card-body h3 {
+    margin: 0 0 0.2rem 0;
+    color: var(--color5);
+    font-size: 1.2rem;
+}
+
+.login-text {
+    color: var(--color3);
+    font-weight: 600;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+}
+
+.info-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 0.8rem;
+    color: #555;
+    font-size: 0.95rem;
+}
+
+.info-row i {
+    width: 20px;
+    color: var(--color2);
+    text-align: center;
+}
+
+/* Футер карточки */
+.card-footer {
+    padding: 1rem 1.5rem;
+    background-color: var(--color0);
+    border-top: 1px solid var(--color1);
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.btn-icon {
+    width: 35px;
+    height: 35px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.btn-block {
+    background-color: rgba(220, 53, 69, 0.1);
+    color: var(--error);
+}
+
+.btn-block:hover {
+    background-color: var(--error);
+    color: var(--color0);
+}
+
+.btn-unblock {
+    background-color: rgba(40, 167, 69, 0.1);
+    color: var(--success);
+}
+
+.btn-unblock:hover {
+    background-color: var(--success);
+    color: var(--color0);
+}
+
+.btn-delete {
+    background-color: transparent;
+    color: #999;
+}
+
+.btn-delete:hover {
+    background-color: #eee;
+    color: #333;
+}
+
+/* === Модальные окна === */
+.modal-overlay {
+    display: none; /* Скрыто по умолчанию */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 2000;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.modal-overlay.show {
+    opacity: 1;
+}
+
+.modal-content {
+    background-color: var(--color0);
+    padding: 2rem;
+    border-radius: 12px;
+    width: 400px;
+    max-width: 90%;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    transform: translateY(-20px);
+    transition: transform 0.3s ease;
+    text-align: center;
+}
+
+.modal-overlay.show .modal-content {
+    transform: translateY(0);
+}
+
+.modal-content h3 {
+    color: var(--color5);
+    margin-top: 0;
+}
+
+.highlight-text {
+    font-weight: bold;
+    color: var(--color3);
+}
+
+.warning-text {
+    color: var(--error);
+    font-size: 0.9rem;
+    margin-top: 5px;
+}
+
+.modal-actions {
+    margin-top: 2rem;
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+}
+
+.btn-secondary {
+    background-color: #ccc;
+    color: #333;
+}
+
+.btn-secondary:hover {
+    background-color: #bbb;
+}
+
+.btn-danger {
+    background-color: var(--error);
+    color: white;
+}
+
+.btn-success {
+    background-color: var(--success);
+    color: white;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    .page-header {
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+    }
+
+    .tabs-container {
+        justify-content: center;
+    }
+
+    .tab-btn.tab-banned {
+        margin-left: 0; /* На мобильных убираем отступ справа */
+    }
+}

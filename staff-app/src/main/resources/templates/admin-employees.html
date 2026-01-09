@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <!-- Иконка и Мета-теги -->
+    <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+    <meta charset="UTF-8">
+    <title>Управление сотрудниками</title>
+
+    <!-- Подключение стилей -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" th:href="@{/css/common.css}">
+    <!-- Специфичные стили для этой страницы (напишем в следующем шаге) -->
+    <link rel="stylesheet" th:href="@{/css/admin-employees.css}">
+</head>
+<body>
+
+<!-- Шапка сайта -->
+<div th:replace="fragments/header :: header"></div>
+
+<div class="main-container">
+
+    <!-- Верхняя панель: Заголовок и кнопка регистрации -->
+    <div class="page-header">
+        <h1>Сотрудники</h1>
+        <a th:href="@{/register}" class="btn btn-add">
+            <i class="fas fa-plus"></i> Новый сотрудник
+        </a>
+    </div>
+
+    <!-- Навигация по вкладкам (Фильтрация) -->
+    <div class="tabs-container">
+        <!-- Цикл по ролям (кроме Клиента) -->
+        <a th:each="role : ${roles}"
+           th:if="${role.name() != 'CLIENT'}"
+           th:href="@{/admin/employees(tab=${role.name()})}"
+           th:classappend="${currentTab == role.name()} ? 'active'"
+           class="tab-btn">
+            <i class="fas"
+               th:classappend="${role.name() == 'ADMIN'} ? 'fa-user-shield' :
+                              (${role.name() == 'COOK'} ? 'fa-utensils' : 'fa-user-tie')"></i>
+            <span th:text="${role.displayName}"></span>
+        </a>
+
+        <!-- Отдельная вкладка для заблокированных -->
+        <a th:href="@{/admin/employees(tab='BANNED')}"
+           th:classappend="${currentTab == 'BANNED'} ? 'active'"
+           class="tab-btn tab-banned">
+            <i class="fas fa-ban"></i> Заблокированные
+        </a>
+    </div>
+
+    <!-- Сетка с карточками сотрудников -->
+    <div class="employees-grid">
+
+        <!-- Сообщение, если список пуст -->
+        <div th:if="${employees.isEmpty()}" class="no-data">
+            <p>В этой категории сотрудников не найдено.</p>
+        </div>
+
+        <!-- Карточка сотрудника -->
+        <div th:each="employee : ${employees}" class="employee-card">
+            <div class="card-header">
+                <!-- Бейдж роли -->
+                <span class="role-badge"
+                      th:classappend="${'role-' + employee.account.role.name().toLowerCase()}"
+                      th:text="${employee.account.role.displayName}">
+                </span>
+
+                <!-- Аватар (заглушка) -->
+                <div class="avatar-circle">
+                    <span th:text="${#strings.substring(employee.fullName, 0, 1)}"></span>
+                </div>
+            </div>
+
+            <div class="card-body">
+                <h3 th:text="${employee.fullName}">ФИО</h3>
+                <p class="login-text">@<span th:text="${employee.account.username}">login</span></p>
+
+                <div class="info-row">
+                    <i class="fas fa-phone"></i>
+                    <span th:text="${employee.phone}">Телефон</span>
+                </div>
+                <div class="info-row">
+                    <i class="fas fa-envelope"></i>
+                    <span th:text="${employee.email}">Email</span>
+                </div>
+                <div class="info-row">
+                    <i class="fas fa-venus-mars"></i>
+                    <span th:text="${employee.gender}">Пол</span>
+                </div>
+                <div class="info-row">
+                    <i class="fas fa-birthday-cake"></i>
+                    <!-- Используем метод getAge(), который мы добавили в сущность -->
+                    <span th:text="${employee.age} + ' лет'">Возраст</span>
+                </div>
+            </div>
+
+            <div class="card-footer">
+                <!-- Кнопка Блокировки -->
+                <!-- Используем data-id и data-name для безопасной передачи данных -->
+                <button th:if="${employee.account.status.name() == 'ACTIVE'}"
+                        class="btn-icon btn-block"
+                        th:data-id="${employee.id}"
+                        th:data-name="${employee.fullName}"
+                        onclick="openBlockModal(this.getAttribute('data-id'), this.getAttribute('data-name'))"
+                        title="Заблокировать">
+                    <i class="fas fa-lock"></i>
+                </button>
+
+                <!-- Кнопка Разблокировки -->
+                <button th:if="${employee.account.status.name() == 'BANNED'}"
+                        class="btn-icon btn-unblock"
+                        th:data-id="${employee.id}"
+                        th:data-name="${employee.fullName}"
+                        onclick="openUnblockModal(this.getAttribute('data-id'), this.getAttribute('data-name'))"
+                        title="Разблокировать">
+                    <i class="fas fa-unlock"></i>
+                </button>
+
+                <!-- Кнопка Удаления -->
+                <button class="btn-icon btn-delete"
+                        th:data-id="${employee.id}"
+                        th:data-name="${employee.fullName}"
+                        onclick="openDeleteModal(this.getAttribute('data-id'), this.getAttribute('data-name'))"
+                        title="Удалить">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- === МОДАЛЬНЫЕ ОКНА (Скрыты по умолчанию) === -->
+
+<!-- Модальное окно Блокировки -->
+<div id="blockModal" class="modal-overlay">
+    <div class="modal-content">
+        <h3>Блокировка сотрудника</h3>
+        <p>Вы уверены, что хотите заблокировать сотрудника <span id="blockName" class="highlight-text"></span>?</p>
+        <p class="warning-text">Он потеряет доступ к системе.</p>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeModal('blockModal')">Отмена</button>
+            <form id="blockForm" method="post">
+                <input type="hidden" name="_csrf" th:value="${_csrf.token}">
+                <button type="submit" class="btn btn-danger">Заблокировать</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно Разблокировки -->
+<div id="unblockModal" class="modal-overlay">
+    <div class="modal-content">
+        <h3>Разблокировка</h3>
+        <p>Вернуть доступ сотруднику <span id="unblockName" class="highlight-text"></span>?</p>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeModal('unblockModal')">Отмена</button>
+            <form id="unblockForm" method="post">
+                <input type="hidden" name="_csrf" th:value="${_csrf.token}">
+                <button type="submit" class="btn btn-success">Разблокировать</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно Удаления -->
+<div id="deleteModal" class="modal-overlay">
+    <div class="modal-content">
+        <h3>Удаление сотрудника</h3>
+        <p>Вы собираетесь удалить сотрудника <span id="deleteName" class="highlight-text"></span>.</p>
+        <p class="warning-text">Это действие необратимо!</p>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeModal('deleteModal')">Отмена</button>
+            <form id="deleteForm" method="post">
+                <input type="hidden" name="_csrf" th:value="${_csrf.token}">
+                <button type="submit" class="btn btn-danger">Удалить навсегда</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Скрипты -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+<script th:src="@{/js/common.js}"></script>
+<script th:src="@{/js/admin-employees.js}"></script>
+
+<!-- Обработка уведомлений (Flash Attributes) -->
+<script th:if="${success}">
+    toastr.success([[${success}]]);
+</script>
+<script th:if="${error}">
+    toastr.error([[${error}]]);
+</script>
+
+</body>
+</html>

@@ -1,36 +1,44 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
-  <!-- Favicon -->
-  <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+    <!-- Favicon -->
+    <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
 
-  <title>Вход</title>
-  <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
-  <link rel="stylesheet" th:href="@{/css/common.css}">
-  <link rel="stylesheet" th:href="@{/css/login.css}">
+    <title>Вход</title>
+    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+    <link rel="stylesheet" th:href="@{/css/common.css}">
+    <link rel="stylesheet" th:href="@{/css/login.css}">
 </head>
 <body>
 <!-- Вставляем шапку -->
 <div th:replace="fragments/header :: header"></div>
 
 <div class="login-container">
-  <h2>Вход</h2>
-  <p th:if="${param.error}" class="error-message">Аккаунт не найден</p>
-  <form th:action="@{/login}" method="post" class="login-form">
-    <div class="form-group">
-      <label>Логин:</label>
-      <input type="text" name="username" required/>
-    </div>
-    <div class="form-group">
-      <label>Пароль:</label>
-      <input type="password" name="password" required/>
-    </div>
-    <div class="form-group">
-      <button type="submit" class="btn">Войти</button>
-    </div>
-  </form>
-  <a th:href="@{/register}" class="btn register-btn">Регистрация</a>
+    <h2>Вход</h2>
+    <p th:if="${param.error}" class="error-message">Аккаунт не найден</p>
+
+    <form th:action="@{/login}" method="post" class="login-form">
+        <div class="form-group">
+            <label>Логин:</label>
+            <input type="text" name="username" required/>
+        </div>
+
+        <div class="form-group">
+            <label>Пароль:</label>
+            <input type="password" name="password" required/>
+        </div>
+
+        <!-- Кнопка Входа -->
+        <div class="form-group">
+            <button type="submit" class="btn">Войти</button>
+        </div>
+
+        <!-- Кнопка Регистрации (теперь внутри формы) -->
+        <div class="form-group" style="margin-bottom: 0;"> <!-- Убираем нижний отступ у последнего элемента -->
+            <a th:href="@{/register}" class="btn">Регистрация</a>
+        </div>
+    </form>
 </div>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -38,18 +46,17 @@
 <script th:src="@{/js/common.js}"></script>
 <script th:src="@{/js/login.js}"></script>
 <script>
-  // Проверка параметра ошибки и отображение уведомления
-  $(document).ready(function() {
-    const hasError = [[${param.error != null ? 'true' : 'false'}]];
-    if (hasError) {
-      toastr.error('Аккаунт не найден', 'Ошибка входа', {
-        closeButton: true,
-        progressBar: true,
-        positionClass: 'toast-top-right',
-        timeOut: 5000
-      });
-    }
-  });
+    $(document).ready(function() {
+      const hasError = [[${param.error != null ? 'true' : 'false'}]];
+      if (hasError) {
+        toastr.error('Аккаунт не найден', 'Ошибка входа', {
+          closeButton: true,
+          progressBar: true,
+          positionClass: 'toast-top-right',
+          timeOut: 5000
+        });
+      }
+    });
 </script>
 </body>
 </html>

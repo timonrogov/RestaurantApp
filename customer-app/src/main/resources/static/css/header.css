@@ -1,0 +1,210 @@
+/* header.css */
+
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--header-height);
+    background: var(--color5); /* Темно-коричневый фон */
+    color: var(--color0);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+}
+
+.header-content {
+    width: 100%;
+    max-width: 1400px; /* Совпадает с main-container */
+    margin: 0 auto;
+    padding: 0 30px;
+    height: 100%;
+}
+
+.header-role-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+}
+
+/* === ЛЕВАЯ ЧАСТЬ === */
+.left-section {
+    display: flex;
+    align-items: center;
+    gap: 40px;
+}
+
+/* Логотип */
+.logo {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    transition: transform 0.3s ease;
+}
+
+.logo:hover {
+    transform: scale(1.2); /* Логотип тоже немного увеличивается */
+}
+
+.logo-img {
+    height: 70px;
+    width: auto;
+    border-radius: 4px;
+}
+
+/* Навигация */
+.main-nav {
+    display: flex;
+    gap: 10px; /* Чуть уменьшил отступ, так как у ссылок появился padding */
+}
+
+/* Общие стили для ссылок меню */
+.nav-link,
+.main-nav a,
+.account-link {
+    color: var(--color1); /* Светло-бежевый текст */
+    font-family: 'Playfair Display', serif;
+    font-weight: 500;
+    font-size: 1.1rem;
+    text-decoration: none;
+
+    /* Новые стили для "кнопочного" эффекта */
+    padding: 8px 16px;       /* Воздух вокруг текста */
+    border-radius: 12px;     /* Закругление как у карточек */
+    transition: all 0.3s ease; /* Плавная анимация всего */
+    display: flex;
+    align-items: center;
+    gap: 8px; /* Отступ иконки от текста */
+}
+
+/* Эффект при наведении (Ховер) */
+.nav-link:hover,
+.main-nav a:hover,
+.account-link:hover {
+    color: white; /* Текст становится ярко-белым */
+    background-color: rgba(255, 255, 255, 0.1); /* Легкий прозрачный фон */
+    transform: translateY(-2px); /* Эффект "взлета" */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Легкая тень */
+}
+
+/* === ПРАВАЯ ЧАСТЬ === */
+.right-section {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.auth-section {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+/* === Кнопка вызова официанта === */
+.call-waiter-btn {
+    background-color: transparent;
+    border: 2px solid var(--color3); /* Рыжая рамка */
+    color: var(--color1); /* Бежевый текст (под цвет ссылок) */
+    padding: 6px 16px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-family: 'Playfair Display', serif;
+    font-weight: 600;
+    font-size: 0.95rem;
+    display: inline-flex; /* Используем inline-flex для выравнивания в строке */
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+    margin: 0; /* Отступы регулирует родительский gap */
+}
+
+/* Эффект при наведении */
+.call-waiter-btn:hover {
+    background-color: var(--color3);
+    color: var(--color0); /* Белый текст */
+    box-shadow: 0 0 12px rgba(159, 87, 39, 0.6); /* Свечение */
+    transform: translateY(-2px);
+}
+
+/* Анимация иконки колокольчика при наведении */
+.call-waiter-btn:hover i {
+    animation: bell-shake 1.0s ease-in-out;
+    transform-origin: top center;
+}
+
+@keyframes bell-shake {
+    0% { transform: rotate(0); }
+    15% { transform: rotate(15deg); }
+    30% { transform: rotate(-15deg); }
+    45% { transform: rotate(10deg); }
+    60% { transform: rotate(-10deg); }
+    75% { transform: rotate(5deg); }
+    85% { transform: rotate(-5deg); }
+    100% { transform: rotate(0); }
+}
+
+/* Кнопка "Войти" и "Выйти" (более акцентная) */
+header .login-btn {
+    background-color: var(--color3); /* Рыжий цвет */
+    color: white !important;
+    padding: 8px 24px;
+    border-radius: 25px; /* Более округлая, чем обычные ссылки */
+    font-family: 'Playfair Display', serif;
+    font-weight: 600;
+    font-size: 1rem;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+header .login-btn:hover {
+    background-color: var(--color4); /* Темнеет при наведении */
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(159, 87, 39, 0.4); /* Рыжая тень */
+}
+
+/* Ссылка "Аккаунт" наследует стили выше (.nav-link),
+   но можно добавить специфику если нужно */
+
+/* Адаптивность */
+@media (max-width: 992px) {
+    .left-section { gap: 20px; }
+    .main-nav a { font-size: 1rem; padding: 6px 12px; }
+}
+
+@media (max-width: 768px) {
+    .header-content { padding: 0 15px; }
+    .main-nav { display: none; } /* Скрываем меню на мобильных */
+    .right-section { gap: 10px; }
+    .logo-img { height: 40px; }
+
+    /* На мобильных убираем текст у кнопки Официант, оставляем иконку */
+    .call-waiter-btn .call-text { display: none; }
+    .call-waiter-btn { padding: 8px; border-radius: 50%; width: 40px; height: 40px; justify-content: center;}
+
+    .call-waiter-btn .call-text {
+            display: none; /* Скрываем текст "Официант" */
+        }
+
+        .call-waiter-btn {
+            padding: 8px;
+            border-radius: 50%; /* Превращаем в круг */
+            width: 40px;
+            height: 40px;
+            justify-content: center;
+        }
+
+        .call-waiter-btn i {
+            font-size: 1.1rem; /* Чуть увеличиваем иконку */
+        }
+}

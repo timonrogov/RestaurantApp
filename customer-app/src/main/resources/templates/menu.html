@@ -132,20 +132,23 @@
                          th:data-reviews-url="@{/dish/{id}/reviews(id=${dish.id})}"/>
 
                     <!-- Общий контейнер для описания и рейтинга -->
+                    <!-- Добавили класс fixed-height-block для фиксированной высоты рейтинга -->
                     <div class="description-rating-container">
-                        <!-- Блок описания -->
-                        <div class="dish-description">
-                            <p th:text="${dish.description}"></p>
+
+                        <!-- ИЗМЕНЕНИЕ: Сворачиваемое описание -->
+                        <div class="dish-description-wrapper">
+                            <p class="dish-description-text collapsed" th:text="${dish.description}"></p>
+                            <span class="read-more-btn">Показать описание</span>
                         </div>
 
                         <!-- Блок рейтинга -->
-                        <div class="rating-block" th:if="${dish.stats}">
-                                    <span class="star"
-                                          th:classappend="${dish.stats.reviewCount > 0} ? 'yellow' : 'gray'">★</span>
-                            <span class="rating-value"
-                                  th:text="${dish.stats.reviewCount > 0} ?
-                                                    ${#numbers.formatDecimal(dish.stats.averageRating, 1, 1)} : '0.0'"></span>
-                            <span class="review-count" th:text="'(' + ${dish.stats.reviewCount} + ')'"></span>
+                        <div class="rating-block-wrapper"> <!-- Обертка для фиксации высоты -->
+                            <div class="rating-block" th:if="${dish.stats}">
+                                <span class="star" th:classappend="${dish.stats.reviewCount > 0} ? 'yellow' : 'gray'">★</span>
+                                <span class="rating-value"
+                                      th:text="${dish.stats.reviewCount > 0} ? ${#numbers.formatDecimal(dish.stats.averageRating, 1, 1)} : '0.0'"></span>
+                                <span class="review-count" th:text="'(' + ${dish.stats.reviewCount} + ')'"></span>
+                            </div>
                         </div>
                     </div>
 
@@ -185,16 +188,19 @@
                     <form class="add-to-order-form">
                         <input type="hidden" name="dishId" th:value="${dish.id}" />
 
-                        <textarea name="comment" placeholder="Ваш комментарий..."></textarea>
+                        <!-- ИЗМЕНЕНИЕ: Поле комментария -->
+                        <textarea name="comment" rows="1" class="comment-input" placeholder="Комментарий к блюду..."></textarea>
 
                         <div class="controls-row">
                             <div class="quantity-group">
-                                <label>Количество</label>
+                                <label>Кол-во</label> <!-- Сократили текст -->
                                 <input type="number" name="quantity" min="1" max="10" value="1" class="quantity-input" />
                             </div>
-                            <button type="button" class="add-to-order-btn">
+
+                            <!-- ИЗМЕНЕНИЕ: Кнопка со стилями -->
+                            <button type="button" class="btn btn-primary add-to-order-btn">
                                 <i class="fas fa-cart-plus"></i>
-                                Добавить в заказ
+                                Добавить в заказ <!-- Сократили текст для компактности -->
                             </button>
                         </div>
                     </form>

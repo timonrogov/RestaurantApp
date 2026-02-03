@@ -1,88 +1,100 @@
 <!-- fragments/header.html -->
 <header th:fragment="header" xmlns:th="http://www.w3.org/1999/xhtml">
-  <div class="header-content">
-    <!-- Для сотрудников -->
-    <div th:if="${#authorization.expression('hasRole(''EMPLOYEE'')')}" class="header-role-content">
-      <!-- Левая часть - админ-меню -->
-      <div class="left-section">
-        <a th:href="@{/admin/orders}">Заказы</a>
-        <a th:href="@{/admin/dishes}">Меню</a>
-        <a th:href="@{/admin/promotions}">Акции</a>
-      </div>
 
-      <!-- Правая часть - выход -->
-      <div class="right-section">
-        <form th:action="@{/logout}" method="post" class="logout-form">
-          <button type="submit" class="nav-link login-btn">Выйти</button>
-        </form>
-      </div>
-    </div>
+    <!-- Подключаем стили шапки и иконки ПРЯМО ЗДЕСЬ, чтобы они были на всех страницах -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" th:href="@{/css/header.css}">
 
-    <!-- Для обычных пользователей -->
-    <div th:unless="${#authorization.expression('hasRole(''EMPLOYEE'')')}" class="header-role-content">
-      <!-- Левая часть - основное меню -->
-      <div class="left-section">
-        <a href="/" class="logo">
-          <img src="/images/logo3.png" alt="Логотип" class="logo-img">
-        </a>
-        <nav class="main-nav">
-          <a th:href="@{/}">Главная</a>
-          <a th:href="@{/menu}">Меню</a>
-          <a th:href="@{/orders}">Заказы</a>
-        </nav>
-      </div>
+    <!-- Стили для вызова официанта -->
+    <link rel="stylesheet" th:href="@{/css/call-waiter.css}">
 
-      <!-- Правая часть - дополнительные опции -->
-      <div class="right-section">
-          <!-- Кнопка вызова официанта -->
-          <button onclick="openCallWaiterModal()" class="call-waiter-btn" title="Вызвать официанта">
-              <i class="fas fa-bell"></i>
-              <span class="call-text">Официант</span>
-          </button>
+    <div class="header-content">
 
-        <a th:href="@{/restaurant-reviews}">Поделитесь мнением</a>
+        <!-- ВАРИАНТ 1: Для сотрудников (Админка) -->
+        <div th:if="${#authorization.expression('hasRole(''EMPLOYEE'')')}" class="header-role-content">
+            <div class="left-section">
+                <a th:href="@{/}" class="logo">
+                    <img th:src="@{/images/logo3.png}" alt="Логотип" class="logo-img">
+                </a>
+                <nav class="main-nav">
+                    <a th:href="@{/admin/orders}">Заказы</a>
+                    <a th:href="@{/admin/dishes}">Меню</a>
+                    <a th:href="@{/admin/promotions}">Акции</a>
+                </nav>
+            </div>
 
-        <div th:if="${#authorization.expression('isAuthenticated()')}" class="auth-section">
-          <a th:href="@{/account}">Аккаунт</a>
-          <form th:action="@{/logout}" method="post" class="logout-form">
-            <button type="submit" class="nav-link login-btn">Выйти</button>
-          </form>
+            <div class="right-section">
+                <form th:action="@{/logout}" method="post" class="logout-form">
+                    <button type="submit" class="nav-link login-btn">Выйти</button>
+                </form>
+            </div>
         </div>
 
-        <div th:unless="${#authorization.expression('isAuthenticated()')}">
-          <a th:href="@{/login}" class="nav-link login-btn">Войти</a>
+        <!-- ВАРИАНТ 2: Для посетителей (обычный сайт) -->
+        <div th:unless="${#authorization.expression('hasRole(''EMPLOYEE'')')}" class="header-role-content">
+
+            <div class="left-section">
+                <a th:href="@{/}" class="logo" title="На главную">
+                    <img th:src="@{/images/logo3.png}" alt="Логотип" class="logo-img">
+                </a>
+                <nav class="main-nav">
+                    <!-- Ссылку "Главная" убрали, так как есть логотип -->
+                    <a th:href="@{/menu}">Меню</a>
+                    <a th:href="@{/orders}">Мои заказы</a>
+                </nav>
+            </div>
+
+            <div class="right-section">
+                <!-- Кнопка вызова официанта -->
+                <button onclick="openCallWaiterModal()" class="call-waiter-btn" title="Вызвать официанта">
+                    <i class="fas fa-bell"></i>
+                    <span class="call-text">Официант</span>
+                </button>
+
+                <a th:href="@{/restaurant-reviews}" class="nav-link" title="Отзывы">
+                    <i class="fas fa-comments"></i> <span class="desktop-only">Отзывы</span>
+                </a>
+
+                <!-- Блок для авторизованных -->
+                <div th:if="${#authorization.expression('isAuthenticated()')}" class="auth-section">
+                    <a th:href="@{/account}" class="account-link">
+                        <i class="fas fa-user"></i> Аккаунт
+                    </a>
+                    <form th:action="@{/logout}" method="post" class="logout-form">
+                        <button type="submit" class="login-btn">Выйти</button>
+                    </form>
+                </div>
+
+                <!-- Блок для гостей -->
+                <div th:unless="${#authorization.expression('isAuthenticated()')}">
+                    <a th:href="@{/login}" class="login-btn">Войти</a>
+                </div>
+            </div>
         </div>
-      </div>
     </div>
-  </div>
 
     <!-- === МОДАЛЬНОЕ ОКНО ВЫЗОВА ОФИЦИАНТА === -->
+    <!-- (Оставляем без изменений, логика в call-waiter.js) -->
     <div id="callWaiterModal" class="waiter-modal-overlay">
         <div class="waiter-modal-content">
             <div class="waiter-modal-header">
                 <h3><i class="fas fa-concierge-bell"></i> Вызов официанта</h3>
                 <span class="close-btn" onclick="closeCallWaiterModal()">&times;</span>
             </div>
-
             <div class="waiter-modal-body">
                 <p>Укажите номер вашего столика, чтобы мы знали, куда подойти.</p>
-
                 <div class="form-group">
                     <input type="text" id="waiterTableNumber" class="waiter-input" placeholder="Например: 12" required>
                 </div>
-
-                <!-- Место для сообщений об ошибках/успехе -->
                 <div id="waiterCallMessage" class="waiter-message"></div>
             </div>
-
             <div class="waiter-modal-footer">
-                <button class="btn-cancel-call" onclick="closeCallWaiterModal()">Отмена</button>
-                <button class="btn-confirm-call" onclick="submitWaiterCall()">Позвать</button>
+                <button class="btn btn-secondary" onclick="closeCallWaiterModal()">Отмена</button>
+                <button class="btn btn-primary" onclick="submitWaiterCall()">Позвать</button>
             </div>
         </div>
     </div>
 
-    <!-- Подключаем стили и скрипты для вызова -->
-    <link rel="stylesheet" href="/css/call-waiter.css">
-    <script src="/js/call-waiter.js"></script>
+    <!-- Скрипт для вызова официанта -->
+    <script th:src="@{/js/call-waiter.js}"></script>
 </header>

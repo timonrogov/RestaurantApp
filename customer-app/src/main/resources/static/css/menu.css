@@ -175,7 +175,7 @@ h1::after {
 }
 
 .dish-item:not(:hover) .add-to-order-btn {
-  opacity: 0.9;
+  opacity: 1; /* Раньше было opacity: 1; чтобы кнопка была светлее до наведения */
 }
 
 /* Форма добавления */

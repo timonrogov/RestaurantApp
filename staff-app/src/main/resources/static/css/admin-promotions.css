@@ -1,97 +1,234 @@
 /* admin-promotions.css */
-.promotion-card {
-    background: var(--color0);
-    border: 2px solid var(--color2);
-    border-radius: 12px;
-    padding: 1.5rem;
-    margin: 1.5rem 0;
-    display: flex;
-    gap: 2rem;
-    align-items: center;
-    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+
+.main-container {
+    padding-bottom: 5rem;
 }
 
-.promotion-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
-    border-color: var(--color3);
-}
-
-.promotion-image {
-    width: 180px;
-    height: 120px;
-    object-fit: cover;
-    border-radius: 8px;
-    border: 2px solid var(--color2);
-}
-
-.promotion-info {
-    flex-grow: 1;
-    color: var(--color5);
-}
-
-.promotion-header {
+/* === 1. Шапка страницы === */
+.admin-page-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 2px solid var(--color1);
+    margin-bottom: 2.5rem;
+    border-bottom: 2px solid var(--color2);
+    padding-bottom: 1rem;
 }
 
-.promotion-header h2 {
-    color: var(--color4);
+.admin-page-header h1 {
     margin: 0;
-    font-size: 1.5rem;
 }
 
-.discount-badge {
-    background: var(--success);
-    color: var(--color0);
-    padding: 0.5rem 1rem;
-    border-radius: 20px;
+/* === 2. Список и карточки === */
+.promotions-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.promo-admin-card {
+    background-color: var(--color0);
+    border-radius: 16px;
+    border: 1px solid var(--color2);
+    display: flex;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+}
+
+.promo-admin-card:hover {
+    transform: translateX(5px); /* Легкий сдвиг вправо вместо взлета */
+    box-shadow: 0 8px 25px rgba(104, 50, 4, 0.1);
+    border-color: var(--color3);
+}
+
+/* Визуальная часть (Фото + Бейдж) */
+.promo-visual {
+    position: relative;
+    width: 240px;
+    /* Убираем фиксированную высоту 180px */
+    height: auto;
+    /* Заставляем контейнер растягиваться на всю высоту родителя (карточки) */
+    align-self: stretch;
+    flex-shrink: 0;
+}
+
+.promo-visual img {
+    width: 100%;
+    height: 100%;
+    /* Важно: cover заполнит всё пространство без искажений */
+    object-fit: cover;
+    display: block;
+}
+
+.discount-label {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    background-color: var(--error);
+    color: white;
+    padding: 5px 12px;
+    border-radius: 8px;
+    font-weight: 800;
+    font-size: 1.1rem;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+}
+
+/* Контентная часть */
+.promo-content {
+    flex-grow: 1;
+    padding: 1.5rem 2rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.promo-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 1rem;
+}
+
+.promo-title-row h2 {
+    margin: 0;
+    font-size: 1.4rem;
+    color: var(--color5);
+}
+
+.promo-id {
+    font-size: 0.8rem;
+    color: var(--color2);
     font-weight: 600;
+}
+
+/* Сетка данных внутри акции */
+.promo-data-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px 30px;
+}
+
+.data-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.data-group .label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--color2);
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.price-display {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.old-price {
+    text-decoration: line-through;
+    color: #999;
+    font-size: 1rem;
+}
+
+.price-display i {
+    color: var(--color2);
+    font-size: 0.8rem;
+}
+
+.new-price {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--success);
+}
+
+.condition-val, .date-range, .time-range {
+    font-weight: 600;
+    color: var(--color5);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.condition-val i, .date-range i, .time-range i {
+    color: var(--color3);
+    font-size: 0.9rem;
+}
+
+/* Секция действий */
+.promo-actions {
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center; /* Центрируем кнопку в плашке */
+    background-color: rgba(238, 226, 214, 0.2);
+    border-left: 1px solid var(--color1);
+    min-width: 80px; /* Фиксируем ширину плашки действий */
+}
+
+.btn-icon {
+    width: 45px;
+    height: 45px;
+    border-radius: 50% !important;
+
+    /* Добавляем флекс для центрирования иконки внутри кнопки */
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+
+    /* Сбрасываем внутренние отступы, которые могут мешать центрированию */
+    padding: 0 !important;
+    line-height: 1;
+}
+
+.btn-icon i {
+    /* Убеждаемся, что у самой иконки нет лишних отступов */
+    margin: 0;
     font-size: 1.1rem;
 }
 
-.promotion-details p {
-    margin: 0.8rem 0;
-    font-size: 0.95rem;
-}
-
-.promotion-details span {
-    font-weight: 500;
+/* === 3. Пустое состояние === */
+.empty-promo-state {
+    text-align: center;
+    padding: 5rem 2rem;
+    background: var(--color0);
+    border-radius: 20px;
+    border: 2px dashed var(--color2);
     color: var(--color4);
 }
 
-.btn-danger {
-    background: var(--error) !important;
-    color: var(--color0) !important;
-    padding: 0.8rem 1.5rem;
-    border-radius: 8px;
-    border: 2px solid var(--error);
-    transition: all 0.3s ease;
-    align-self: flex-start;
+.empty-promo-state i {
+    font-size: 4rem;
+    color: var(--color1);
+    margin-bottom: 1.5rem;
 }
 
-.btn-danger:hover {
-    background: var(--color0) !important;
-    color: var(--error) !important;
-    transform: translateY(-2px);
+.empty-promo-state h3 { margin-bottom: 0.5rem; }
+.empty-promo-state p { margin-bottom: 2rem; }
+
+/* === Адаптивность === */
+@media (max-width: 850px) {
+    .promo-admin-card {
+        flex-direction: column;
+    }
+
+    .promo-visual {
+        width: 100%;
+        height: 150px;
+    }
+
+    .promo-actions {
+        border-left: none;
+        border-top: 1px solid var(--color1);
+        justify-content: flex-end;
+    }
 }
 
-.btn-primary {
-    background: var(--color4);
-    color: var(--color0);
-    padding: 1rem 2rem;
-    border-radius: 8px;
-    text-decoration: none;
-    font-weight: 600;
-    transition: all 0.3s ease;
-}
-
-.btn-primary:hover {
-    background: var(--color3);
-    transform: translateY(-2px);
+@media (max-width: 500px) {
+    .promo-data-grid {
+        grid-template-columns: 1fr;
+    }
 }

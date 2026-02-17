@@ -1,91 +1,118 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
-  <!-- Favicon -->
-  <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+    <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+    <meta charset="UTF-8">
+    <title>Новая акция</title>
 
-  <meta charset="UTF-8">
-  <title>Новая акция</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
-  <link rel="stylesheet" th:href="@{/css/common.css}">
-  <link rel="stylesheet" th:href="@{/css/new-promotion.css}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" th:href="@{/css/common.css}">
+    <link rel="stylesheet" th:href="@{/css/new-promotion.css}">
 </head>
 <body>
+
 <div th:replace="fragments/header :: header"></div>
 
-<div class="container">
-  <h1>Создание новой акции</h1>
+<div class="main-container">
 
-  <div th:if="${error}" class="alert-error" th:text="${error}"></div>
-  <div th:if="${success}" class="alert-success" th:text="${success}"></div>
-
-  <form class="promotion-form" th:action="@{/admin/promotions/create}"
-        method="post" id="promotionForm">
-    <input type="hidden" name="_csrf" th:value="${_csrf.token}">
-
-    <!-- Выбор блюда -->
-    <div class="form-group">
-      <label>Блюдо:</label>
-      <select class="form-control" name="dish.id"
-              id="dishSelect" required
-              th:onchange="updatePrice()">
-        <option value="">Выберите блюдо</option>
-        <option th:each="dish : ${allDishes}"
-                th:value="${dish.id}"
-                th:text="${dish.name}"
-                th:data-price="${dish.price}"></option>
-      </select>
-      <div class="price-display" id="priceDisplay"></div>
+    <div class="page-header">
+        <h1>Создание акции</h1>
+        <a th:href="@{/admin/promotions}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Назад
+        </a>
     </div>
 
-    <!-- Скидка -->
-    <div class="form-group">
-      <label>Скидка (%):</label>
-      <input type="number" class="form-control"
-             name="discountPercentage" min="1" max="100"
-             step="1" required>
+    <div th:if="${error}" class="alert alert-error">
+        <i class="fas fa-exclamation-circle"></i> <span th:text="${error}"></span>
+    </div>
+    <div th:if="${success}" class="alert alert-success">
+        <i class="fas fa-check-circle"></i> <span th:text="${success}"></span>
     </div>
 
-    <!-- Минимальное количество -->
-    <div class="form-group">
-      <label>Минимальное количество:</label>
-      <input type="number" class="form-control"
-             name="minQuantity" min="1" required
-             th:field="*{promotion.minQuantity}">
-    </div>
+    <form class="promotion-form" th:action="@{/admin/promotions/create}" method="post" id="promotionForm">
+        <input type="hidden" name="_csrf" th:value="${_csrf.token}">
 
-    <!-- Даты -->
-    <div class="form-group">
-      <label>Дата начала:</label>
-      <input type="date" class="form-control"
-             name="startDate" required
-             th:value="${#temporals.format(timeSlot.startDate.workDate, 'yyyy-MM-dd')}">
-    </div>
+        <div class="form-grid">
 
-    <div class="form-group">
-      <label>Дата окончания:</label>
-      <input type="date" class="form-control"
-             name="endDate" required
-             th:value="${#temporals.format(timeSlot.endDate.workDate, 'yyyy-MM-dd')}">
-    </div>
+            <!-- ЛЕВАЯ КОЛОНКА: Параметры акции -->
+            <div class="form-column">
+                <h3><i class="fas fa-tag"></i> Условия акции</h3>
 
-    <!-- Время -->
-    <div class="form-group">
-      <label>Время начала:</label>
-      <input type="time" class="form-control"
-             name="startTime" required
-             th:value="${#temporals.format(timeSlot.startTime, 'HH:mm')}">
-    </div>
+                <div class="form-group">
+                    <label>Выберите блюдо</label>
+                    <select class="form-control" name="dish.id" id="dishSelect" required onchange="calculateNewPrice()">
+                        <option value="" disabled selected>-- Список блюд --</option>
+                        <option th:each="dish : ${allDishes}"
+                                th:value="${dish.id}"
+                                th:text="${dish.name}"
+                                th:data-price="${dish.price}"></option>
+                    </select>
+                </div>
 
-    <div class="form-group">
-      <label>Время окончания:</label>
-      <input type="time" class="form-control"
-             name="endTime" required
-             th:value="${#temporals.format(timeSlot.endTime, 'HH:mm')}">
-    </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Скидка (%)</label>
+                        <input type="number" class="form-control" id="discountInput"
+                               name="discountPercentage" min="1" max="99" step="1"
+                               placeholder="20" required oninput="calculateNewPrice()">
+                    </div>
 
-    <button type="submit" class="btn-primary">Добавить акцию</button>
-  </form>
+                    <div class="form-group">
+                        <label>Мин. кол-во (шт)</label>
+                        <input type="number" class="form-control"
+                               name="minQuantity" min="1" value="1" required
+                               th:field="*{promotion.minQuantity}">
+                    </div>
+                </div>
+
+                <!-- Блок предпросмотра цены -->
+                <div class="price-preview-card" id="pricePreviewBox" style="display: none;">
+                    <span class="preview-label">Цена со скидкой:</span>
+                    <div class="preview-values">
+                        <span id="oldPriceVal" class="old-val">0 ₽</span>
+                        <i class="fas fa-arrow-right"></i>
+                        <span id="newPriceVal" class="new-val">0 ₽</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ПРАВАЯ КОЛОНКА: Время действия -->
+            <div class="form-column">
+                <h3><i class="far fa-calendar-alt"></i> Период проведения</h3>
+
+                <div class="form-group">
+                    <label>Даты (Начало — Конец)</label>
+                    <div class="date-row">
+                        <input type="date" class="form-control" name="startDate" required
+                               th:value="${#temporals.format(timeSlot.startDate.workDate, 'yyyy-MM-dd')}">
+                        <span class="separator">—</span>
+                        <input type="date" class="form-control" name="endDate" required
+                               th:value="${#temporals.format(timeSlot.endDate.workDate, 'yyyy-MM-dd')}">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Время действия (ежедневно)</label>
+                    <div class="date-row">
+                        <input type="time" class="form-control" name="startTime" required
+                               th:value="${#temporals.format(timeSlot.startTime, 'HH:mm')}">
+                        <span class="separator">—</span>
+                        <input type="time" class="form-control" name="endTime" required
+                               th:value="${#temporals.format(timeSlot.endTime, 'HH:mm')}">
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="form-footer">
+            <button type="submit" class="btn btn-primary btn-lg">
+                Создать акцию
+            </button>
+        </div>
+
+    </form>
 </div>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>

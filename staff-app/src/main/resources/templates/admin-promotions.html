@@ -1,78 +1,112 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
-  <!-- Favicon -->
-  <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+    <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+    <meta charset="UTF-8">
+    <title>Панель персонала | Акции</title>
 
-  <meta charset="UTF-8">
-  <title>Управление акциями</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
-  <link rel="stylesheet" th:href="@{/css/common.css}">
-  <link rel="stylesheet" th:href="@{/css/admin-promotions.css}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" th:href="@{/css/common.css}">
+    <link rel="stylesheet" th:href="@{/css/admin-promotions.css}">
 </head>
 <body>
+
 <div th:replace="fragments/header :: header"></div>
 
-<div class="container">
-  <h1>Управление акциями</h1>
-
-  <!-- Список акций -->
-  <div th:each="promotion : ${promotions}" class="promotion-card">
-    <img th:src="${promotion.dish.imagePath != null} ?
-                @{${promotion.dish.imagePath}} : @{/images/placeholder.jpg}"
-         class="promotion-image" alt="Фото блюда">
-
-    <div class="promotion-info">
-      <div class="promotion-header">
-        <h2 th:text="${promotion.dish.name}"></h2>
-          <span class="discount-badge"
-                th:text="'-' + ${#numbers.formatDecimal(promotion.discount * 100, 0, 0)} + '%'">
-            </span>
-      </div>
-
-      <div class="promotion-details">
-        <p>ID акции: <span th:text="${promotion.id}"></span></p>
-        <p>Цена без скидки:
-          <span th:text="${#numbers.formatDecimal(promotion.dish.price, 0, 'COMMA', 2, 'POINT')} + ' ₽'">
-                        </span>
-        </p>
-          <p>Цена со скидкой:
-              <span th:text="${#numbers.formatDecimal(
-                    promotion.dish.price * (1 - promotion.discount),
-                    0, 'COMMA', 2, 'POINT')} + ' ₽'">
-                </span>
-          </p>
-        <p>Минимальное количество:
-          <span th:text="${promotion.minQuantity} + ' шт.'"></span>
-        </p>
-        <p>Период действия:
-          <span th:text="${#temporals.format(promotion.promotionTimeSlot.startDate.workDate, 'dd.MM.yyyy')} + ' - ' +
-                            ${#temporals.format(promotion.promotionTimeSlot.endDate.workDate, 'dd.MM.yyyy')}">
-                        </span>
-        </p>
-        <p>Время действия:
-          <span th:text="${#temporals.format(promotion.promotionTimeSlot.startTime, 'HH:mm')} + ' - ' +
-                            ${#temporals.format(promotion.promotionTimeSlot.endTime, 'HH:mm')}">
-                        </span>
-        </p>
-      </div>
+<div class="main-container">
+    <div class="admin-page-header">
+        <h1>Управление акциями</h1>
+        <a th:href="@{/admin/promotions/new}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Добавить акцию
+        </a>
     </div>
 
-    <form th:action="@{/admin/promotions/delete/{id}(id=${promotion.id})}"
-          method="post">
-      <input type="hidden" name="_csrf" th:value="${_csrf.token}">
-      <button type="submit" class="btn-danger">Удалить</button>
-    </form>
-  </div>
+    <!-- Список акций -->
+    <div class="promotions-grid">
 
-  <div style="margin-top: 30px;">
-    <a href="/admin/promotions/new" class="btn-primary">Добавить новую акцию</a>
-  </div>
+        <!-- Пустое состояние -->
+        <div th:if="${promotions.isEmpty()}" class="empty-promo-state">
+            <i class="fas fa-percentage"></i>
+            <p>На данный момент активных акций нет</p>
+            <a th:href="@{/admin/promotions/new}" class="btn btn-secondary">Создать первую акцию</a>
+        </div>
+
+        <div th:each="promotion : ${promotions}" class="promo-admin-card">
+
+            <!-- Левая часть: Изображение с бейджем -->
+            <div class="promo-visual">
+                <img th:src="${promotion.dish.imagePath != null} ? @{${promotion.dish.imagePath}} : @{/images/placeholder.jpg}"
+                     alt="Фото блюда">
+                <div class="discount-label" th:text="'-' + ${#numbers.formatDecimal(promotion.discount * 100, 0, 0)} + '%'"></div>
+            </div>
+
+            <!-- Центральная часть: Инфо -->
+            <div class="promo-content">
+                <div class="promo-title-row">
+                    <h2 th:text="${promotion.dish.name}">Название блюда</h2>
+                    <span class="promo-id" th:text="'ID: ' + ${promotion.id}"></span>
+                </div>
+
+                <div class="promo-data-grid">
+                    <!-- Блок цен -->
+                    <div class="data-group">
+                        <span class="label">Выгода для клиента</span>
+                        <div class="price-display">
+                            <span class="old-price" th:text="${#numbers.formatDecimal(promotion.dish.price, 1, 0)} + ' ₽'"></span>
+                            <i class="fas fa-long-arrow-alt-right"></i>
+                            <span class="new-price" th:text="${#numbers.formatDecimal(promotion.dish.price * (1 - promotion.discount), 1, 0)} + ' ₽'"></span>
+                        </div>
+                    </div>
+
+                    <!-- Условия -->
+                    <div class="data-group">
+                        <span class="label">Условие</span>
+                        <div class="condition-val">
+                            <i class="fas fa-shopping-basket"></i>
+                            от <span th:text="${promotion.minQuantity}">1</span> шт.
+                        </div>
+                    </div>
+
+                    <!-- Период дат -->
+                    <div class="data-group">
+                        <span class="label">Даты проведения</span>
+                        <div class="date-range">
+                            <i class="far fa-calendar-check"></i>
+                            <span th:text="${#temporals.format(promotion.promotionTimeSlot.startDate.workDate, 'dd.MM.yyyy')}"></span>
+                            —
+                            <span th:text="${#temporals.format(promotion.promotionTimeSlot.endDate.workDate, 'dd.MM.yyyy')}"></span>
+                        </div>
+                    </div>
+
+                    <!-- Время -->
+                    <div class="data-group">
+                        <span class="label">Часы действия</span>
+                        <div class="time-range">
+                            <i class="far fa-clock"></i>
+                            <span th:text="${#temporals.format(promotion.promotionTimeSlot.startTime, 'HH:mm')}"></span>
+                            —
+                            <span th:text="${#temporals.format(promotion.promotionTimeSlot.endTime, 'HH:mm')}"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Правая часть: Действия -->
+            <div class="promo-actions">
+                <form th:action="@{/admin/promotions/delete/{id}(id=${promotion.id})}" method="post"
+                      onsubmit="return confirm('Вы уверены, что хотите удалить эту акцию?')">
+                    <input type="hidden" name="_csrf" th:value="${_csrf.token}">
+                    <button type="submit" class="btn btn-danger btn-icon" title="Удалить акцию">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
 <script th:src="@{/js/common.js}"></script>
-<script th:src="@{/js/admin-promotions.js}"></script>
 </body>
 </html>

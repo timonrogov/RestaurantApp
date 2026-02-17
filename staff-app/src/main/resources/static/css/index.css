@@ -1,90 +1,148 @@
-/* index.css */
+/* index.css для staff-app */
 
-/* Подключаем шрифт Lobster */
-@import url('https://fonts.googleapis.com/css2?family=Lobster&display=swap');
-
-/* Стили для основного контейнера */
 .main-container {
+    max-width: 1200px;
+    padding-bottom: 5rem;
+}
+
+/* === 1. Заголовок === */
+.dashboard-header {
     text-align: center;
-    padding: 2rem;
-    background-color: var(--color1);
+    margin-bottom: 3rem;
 }
 
-/* Стили для названия ресторана */
-.restaurant-title {
-    font-family: 'Lobster', cursive;
-    font-size: 4rem;
-    color: var(--color4);
-    margin-bottom: 0rem;
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1); /* Лёгкая тень для объёма */
-}
-
-/* Стили для изображения */
-.restaurant-logo {
-    width: 500px;
-    height: auto;
-    margin-bottom: 0.5rem;
-    border-radius: 10px; /* Закругленные углы */
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); /* Тень для глубины */
-}
-
-/* Стили для заголовка */
-h1 {
+.dashboard-header h1 {
     font-size: 2.5rem;
-    margin-bottom: 1rem;
-    margin-top: 0.5rem;
-}
-
-/* Стили для текста */
-p {
-    font-size: 1.2rem;
     margin-bottom: 0.5rem;
+    color: var(--color5);
 }
 
-/* Стили для ссылки на меню */
-.menu-link {
-    display: inline-block;
-    padding: 0.8rem 1.5rem;
-    background-color: var(--color3); /* Тёплый оранжевый цвет */
-    color: white;
+.subtitle {
+    font-size: 1.1rem;
+    color: var(--color4);
+}
+
+/* === 2. Сетка дашборда === */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 30px;
+}
+
+/* === 3. Карточка навигации === */
+.dash-card {
+    background-color: var(--color0);
+    border: 1px solid var(--color2);
+    border-radius: 16px;
+    padding: 2rem;
     text-decoration: none;
-    border-radius: 8px;
-    transition: all 0.3s ease; /* Плавные эффекты */
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Эффект при наведении */
+.dash-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(159, 87, 39, 0.15);
+    border-color: var(--color3);
+}
+
+/* Иконка слева */
+.card-icon {
+    /* Фиксированные размеры */
+    width: 60px;
+    height: 60px;
+
+    /* ГЛАВНОЕ ИСПРАВЛЕНИЕ: запрещаем сжатие */
+    flex-shrink: 0;
+
+    /* Для надежности фиксируем минимальные размеры */
+    min-width: 60px;
+    min-height: 60px;
+
+    background-color: rgba(238, 226, 214, 0.3);
+    border-radius: 50%; /* Делает блок идеально круглым */
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    font-size: 1.5rem;
+    color: var(--color3);
+    transition: all 0.3s ease;
+}
+
+.dash-card:hover .card-icon {
+    background-color: var(--color3);
+    color: var(--color0);
+}
+
+/* Текст */
+.card-content {
+    flex-grow: 1;
+}
+
+.card-content h3 {
+    margin: 0 0 5px 0;
+    font-size: 1.3rem;
+    color: var(--color5);
+}
+
+.card-content p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: #777;
+    line-height: 1.4;
+}
+
+/* Стрелочка справа */
+.card-action {
+    color: var(--color2);
     font-size: 1.2rem;
-    margin-top: 1rem;
+    transition: transform 0.3s ease, color 0.3s ease;
 }
 
-.menu-link:hover {
-    background-color: var(--color4); /* Более тёмный оттенок при наведении */
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    transform: translateY(-2px); /* Лёгкий подъём */
+.dash-card:hover .card-action {
+    transform: translateX(5px);
+    color: var(--color3);
 }
 
-.toast-custom.toast-error {
-    background-color: var(--error);
-    color: white;
+/* Вторичная карточка (Профиль) - чуть спокойнее */
+.secondary-card {
+    background-color: transparent;
+    border: 2px dashed var(--color2);
+    box-shadow: none;
 }
 
-/* Адаптивность для мобильных устройств */
-@media (max-width: 768px) {
-    .restaurant-title {
-        font-size: 3rem;
+.secondary-card:hover {
+    background-color: var(--color0);
+    border-style: solid;
+}
+
+.secondary-card .card-icon {
+    background-color: transparent;
+    border: 2px solid var(--color2);
+    color: var(--color2);
+}
+
+.secondary-card:hover .card-icon {
+    border-color: var(--color3);
+    background-color: var(--color3);
+    color: var(--color0);
+}
+
+/* === Адаптивность === */
+@media (max-width: 576px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
     }
 
-    .restaurant-logo {
-        width: 200px;
-    }
-
-    h1 {
-        font-size: 2rem;
-    }
-
-    p {
-        font-size: 1rem;
-    }
-
-    .menu-link {
-        font-size: 1rem;
-        padding: 0.6rem 1.2rem;
+    .dash-card {
+        padding: 1.5rem;
     }
 }

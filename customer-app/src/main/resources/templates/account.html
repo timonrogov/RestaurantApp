@@ -1,34 +1,83 @@
-<!-- account.html -->
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
-  <!-- Favicon -->
-  <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+    <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+    <title>Мой профиль</title>
 
-  <title>Аккаунт</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
-  <link rel="stylesheet" th:href="@{/css/common.css}">
-  <link rel="stylesheet" th:href="@{/css/account.css}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" th:href="@{/css/common.css}">
+    <link rel="stylesheet" th:href="@{/css/account.css}">
 </head>
 <body>
+
 <div th:replace="fragments/header :: header"></div>
 
-<h1>Ваш аккаунт</h1>
-<div th:if="${client != null}">
-  <p>Логин: <span th:text="${client.account.username}"></span></p>
-  <p>ФИО: <span th:text="${client.fullName}"></span></p>
-  <p>Телефон: <span th:text="${client.phone}"></span></p>
-  <p>Email: <span th:text="${client.email}"></span></p>
-  <p>Пол: <span th:text="${client.gender}"></span></p>
-  <p>Дата рождения: <span th:text="${#temporals.format(client.dateOfBirth, 'dd.MM.yyyy')}"></span></p>
-</div>
-<div th:if="${client == null}">
-  <p>Аккаунт не найден.</p>
+<div class="main-container">
+
+    <div th:if="${client != null}" class="profile-card">
+        <!-- 1. Шапка профиля с аватаром -->
+        <div class="profile-header">
+            <div class="user-avatar-big" th:text="${#strings.substring(client.fullName, 0, 1)}"></div>
+            <div class="user-main-info">
+                <h1 th:text="${client.fullName}">Имя Фамилия</h1>
+                <span class="user-status-tag">Постоянный гость</span>
+            </div>
+        </div>
+
+        <!-- 2. Сетка данных -->
+        <div class="profile-details">
+            <div class="detail-section">
+                <h3><i class="fas fa-id-card"></i> Аккаунт</h3>
+                <div class="detail-row">
+                    <span class="label">Логин:</span>
+                    <span class="value" th:text="'@' + ${client.account.username}">@login</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Email:</span>
+                    <span class="value" th:text="${client.email}">email@mail.com</span>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <h3><i class="fas fa-user"></i> Личные данные</h3>
+                <div class="detail-row">
+                    <span class="label"><i class="fas fa-phone-alt"></i> Телефон:</span>
+                    <span class="value" th:text="${client.phone} ?: 'Не указан'">+7...</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label"><i class="fas fa-venus-mars"></i> Пол:</span>
+                    <span class="value" th:text="${client.gender}">Мужской</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label"><i class="fas fa-birthday-cake"></i> День рождения:</span>
+                    <span class="value" th:text="${#temporals.format(client.dateOfBirth, 'dd MMMM yyyy')}">01.01.2000</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Быстрые ссылки -->
+        <div class="profile-actions">
+            <a th:href="@{/orders}" class="btn btn-primary">
+                <i class="fas fa-history"></i> Мои заказы
+            </a>
+            <a th:href="@{/restaurant-reviews}" class="btn btn-secondary">
+                <i class="fas fa-star"></i> Мои отзывы
+            </a>
+        </div>
+    </div>
+
+    <!-- Сообщение, если профиль не найден -->
+    <div th:if="${client == null}" class="error-profile-state">
+        <i class="fas fa-user-slash"></i>
+        <p>Профиль не найден или доступ ограничен.</p>
+        <a th:href="@{/login}" class="btn btn-primary">Войти в аккаунт</a>
+    </div>
+
 </div>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
 <script th:src="@{/js/common.js}"></script>
-<script th:src="@{/js/account.js}"></script>
 </body>
 </html>

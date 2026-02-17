@@ -1,26 +1,86 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
-    <!-- Favicon -->
     <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
-
     <meta charset="UTF-8">
-    <title>Ресторан</title>
+    <title>Бобр и Точка!</title>
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" th:href="@{/css/common.css}">
     <link rel="stylesheet" th:href="@{/css/index.css}">
 </head>
 <body>
-<!-- Вставляем шапку -->
+
 <div th:replace="fragments/header :: header"></div>
 
 <div class="main-container">
-    <div class="restaurant-title">Бобр и Точка!</div>
-    <img src="/images/logo2.jpg" alt="Логотип ресторана" class="restaurant-logo">
-    <h1>Добро пожаловать в наш ресторан!</h1>
-    <p>Время работы:</p>
-    <p>Без выходных с 9:00 до 21:00</p>
-    <a th:href="@{/menu}" class="menu-link">Посмотреть меню</a>
+
+    <!-- 1. Hero Секция -->
+    <section class="hero-section fade-in">
+        <div class="hero-content">
+            <h1 class="restaurant-title">Бобр и Точка!</h1>
+            <p class="hero-subtitle">На ужин готовим полено и вкусно!</p>
+            <div class="hero-info">
+                <div class="info-item">
+                    <i class="fas fa-clock"></i>
+                    <span>09:00 — 21:00</span>
+                </div>
+                <div class="info-item">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <span>Ул. Бобруйская, 42</span>
+                </div>
+            </div>
+            <a th:href="@{/menu}" class="btn btn-primary btn-lg">Заказать обед</a>
+        </div>
+        <div class="hero-image-wrapper">
+            <img src="/images/logo2.jpg" alt="Фирменное блюдо" class="hero-img">
+        </div>
+    </section>
+
+    <!-- 2. Секция быстрых действий -->
+    <section class="quick-actions">
+        <div class="action-card">
+            <i class="fas fa-utensils"></i>
+            <h3>Наше меню</h3>
+            <p>От классических закусок до изысканных десертов</p>
+            <a th:href="@{/menu}" class="btn btn-secondary">Смотреть</a>
+        </div>
+
+        <div class="action-card">
+            <i class="fas fa-shopping-bag"></i>
+            <h3>Мои заказы</h3>
+            <p>Следите за статусом приготовления в реальном времени</p>
+            <a th:href="@{/orders}" class="btn btn-secondary">Перейти</a>
+        </div>
+
+        <div class="action-card">
+            <i class="fas fa-star"></i>
+            <h3>Отзывы</h3>
+            <p>Узнайте, что говорят о нас другие гости</p>
+            <a th:href="@{/restaurant-reviews}" class="btn btn-secondary">Читать</a>
+        </div>
+    </section>
+
+    <!-- 3. Блок преимуществ -->
+    <section class="features-section">
+        <div class="feature">
+            <div class="feature-icon"><i class="fas fa-leaf"></i></div>
+            <h4>Свежие продукты</h4>
+            <p>Используем только локальные продукты высшего качества</p>
+        </div>
+        <div class="feature">
+            <div class="feature-icon"><i class="fas fa-bolt"></i></div>
+            <h4>Умная кухня</h4>
+            <p>Наша интеллектуальная система оптимизирует время ожидания</p>
+        </div>
+        <div class="feature">
+            <div class="feature-icon"><i class="fas fa-heart"></i></div>
+            <h4>Сделано с любовью</h4>
+            <p>Каждое блюдо готовится индивидуально для вас</p>
+        </div>
+    </section>
+
 </div>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>

@@ -1,24 +1,116 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head>
-    <!-- Favicon -->
     <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
-
     <meta charset="UTF-8">
-    <title>Ресторан</title>
+    <title>Панель управления</title>
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" th:href="@{/css/common.css}">
     <link rel="stylesheet" th:href="@{/css/index.css}">
 </head>
 <body>
-<!-- Вставляем шапку -->
+
 <div th:replace="fragments/header :: header"></div>
 
 <div class="main-container">
-    <div class="restaurant-title">Бобр и Точка!</div>
-    <img src="/images/logo2.jpg" alt="Логотип ресторана" class="restaurant-logo">
-    <h1>Вы находитесь на странице управления системой ресторана.</h1>
-    <a th:href="@{/admin/orders}" class="menu-link">Посмотреть перечень заказов</a>
+
+    <!-- Приветственный блок -->
+    <div class="dashboard-header">
+        <h1>Панель управления</h1>
+        <p class="subtitle">Добро пожаловать в систему, <span sec:authentication="name" style="font-weight: 700; color: var(--color3);">User</span>!</p>
+    </div>
+
+    <!-- Сетка навигации -->
+    <div class="dashboard-grid">
+
+        <!-- Карточка: ЗАКАЗЫ (Видна всем) -->
+        <a th:href="@{/admin/orders}" class="dash-card">
+            <div class="card-icon">
+                <i class="fas fa-clipboard-list"></i>
+            </div>
+            <div class="card-content">
+                <h3>Заказы</h3>
+                <p>Управление текущими заказами и статусами</p>
+            </div>
+            <div class="card-action">
+                <i class="fas fa-arrow-right"></i>
+            </div>
+        </a>
+
+        <!-- Карточка: ВЫЗОВЫ (Официант, Админ) -->
+        <a th:href="@{/admin/calls}" class="dash-card" sec:authorize="hasAnyRole('WAITER', 'ADMIN')">
+            <div class="card-icon">
+                <i class="fas fa-concierge-bell"></i>
+            </div>
+            <div class="card-content">
+                <h3>Вызовы</h3>
+                <p>Запросы от гостей из зала</p>
+            </div>
+            <div class="card-action">
+                <i class="fas fa-arrow-right"></i>
+            </div>
+        </a>
+
+        <!-- Карточка: МЕНЮ (Админ) -->
+        <a th:href="@{/admin/dishes}" class="dash-card" sec:authorize="hasRole('ADMIN')">
+            <div class="card-icon">
+                <i class="fas fa-book-open"></i>
+            </div>
+            <div class="card-content">
+                <h3>Меню</h3>
+                <p>Редактирование блюд и категорий</p>
+            </div>
+            <div class="card-action">
+                <i class="fas fa-arrow-right"></i>
+            </div>
+        </a>
+
+        <!-- Карточка: АКЦИИ (Админ) -->
+        <a th:href="@{/admin/promotions}" class="dash-card" sec:authorize="hasRole('ADMIN')">
+            <div class="card-icon">
+                <i class="fas fa-tags"></i>
+            </div>
+            <div class="card-content">
+                <h3>Акции</h3>
+                <p>Управление скидками и спецпредложениями</p>
+            </div>
+            <div class="card-action">
+                <i class="fas fa-arrow-right"></i>
+            </div>
+        </a>
+
+        <!-- Карточка: СОТРУДНИКИ (Админ) -->
+        <a th:href="@{/admin/employees}" class="dash-card" sec:authorize="hasRole('ADMIN')">
+            <div class="card-icon">
+                <i class="fas fa-users-cog"></i>
+            </div>
+            <div class="card-content">
+                <h3>Персонал</h3>
+                <p>Регистрация и управление доступом</p>
+            </div>
+            <div class="card-action">
+                <i class="fas fa-arrow-right"></i>
+            </div>
+        </a>
+
+        <!-- Карточка: ПРОФИЛЬ (Всем) -->
+        <a th:href="@{/profile}" class="dash-card secondary-card">
+            <div class="card-icon">
+                <i class="fas fa-id-badge"></i>
+            </div>
+            <div class="card-content">
+                <h3>Мой профиль</h3>
+                <p>Личные данные и настройки</p>
+            </div>
+            <div class="card-action">
+                <i class="fas fa-arrow-right"></i>
+            </div>
+        </a>
+
+    </div>
 </div>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>

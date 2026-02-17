@@ -5,11 +5,12 @@
     <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
 
     <meta charset="UTF-8">
-    <title>Ваш заказ</title>
+    <title>Подтверждение заказа</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" th:href="@{/css/common.css}">
     <link rel="stylesheet" th:href="@{/css/view-order.css}">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
     <meta th:name="_csrf" th:content="${_csrf.token}"/>
     <meta th:name="_csrf_header" th:content="${_csrf.headerName}"/>
 </head>
@@ -17,56 +18,89 @@
 <div th:replace="fragments/header :: header"></div>
 
 <div class="main-container">
-    <h1>Корзина</h1>
+    <h1>Подтверждение заказа</h1>
 
-    <!-- Список блюд в виде карточек -->
-    <div th:if="${orderItems != null and !orderItems.isEmpty()}" class="order-items">
-        <div th:each="item : ${orderItems}" class="order-item">
-            <img th:if="${item.dish.imagePath != null}" th:src="@{${item.dish.imagePath}}" alt="Фото блюда" class="dish-image"/>
-            <img th:unless="${item.dish.imagePath != null}" th:src="@{/static/images/placeholder.jpg}" alt="Фото блюда" class="dish-image"/>
-            <div class="dish-info">
-                <h3 th:text="${item.dish.name}"></h3>
-                <p>Количество: <span th:text="${item.quantity}"></span></p>
-                <p th:if="${item.comment != ''}">Комментарий:</p>
-                <div th:if="${item.comment != ''}" class="comment-block">
-                    <p th:text="${item.comment != null} ? ${item.comment} : 'Нет'"></p>
-                </div>
-                <p>Цена:
-                    <span th:if="${item.appliedDiscount > 0}" class="original-price" th:text="${#numbers.formatDecimal(item.dish.price, 1, 2)} + ' ₽'"></span>
-                    <span th:text="${#numbers.formatDecimal(item.dish.price * (1 - item.appliedDiscount), 1, 2)} + ' ₽'"></span>
-                </p>
-                <p>Сумма: <span th:text="${#numbers.formatDecimal(item.quantity * item.dish.price * (1 - item.appliedDiscount), 1, 2)} + ' ₽'"></span></p>
+    <!-- 1. Список блюд -->
+    <div th:if="${orderItems != null and !orderItems.isEmpty()}" class="cart-items-grid">
+        <div th:each="item : ${orderItems}" class="cart-item-card">
+
+            <div class="card-image-wrapper">
+                <img th:if="${item.dish.imagePath != null}" th:src="@{${item.dish.imagePath}}" alt="Фото блюда" class="dish-image"/>
+                <img th:unless="${item.dish.imagePath != null}" th:src="@{/images/placeholder.jpg}" alt="Фото блюда" class="dish-image"/>
             </div>
-            <button class="remove-item-btn btn" th:data-item-id="${item.id}">
-                <i class="fas fa-trash"></i> Убрать
+
+            <div class="card-content">
+                <h3 th:text="${item.dish.name}">Название блюда</h3>
+
+                <div class="item-meta">
+                    <span class="item-qty" th:text="${item.quantity} + ' шт.'"></span>
+                    <div class="item-prices">
+                        <div class="unit-price-info">
+                            <span th:text="${#numbers.formatDecimal(item.dish.price * (1 - item.appliedDiscount), 1, 0)} + ' ₽/шт.'"></span>
+                        </div>
+                        <span th:if="${item.appliedDiscount > 0}" class="old-price"
+                              th:text="${#numbers.formatDecimal(item.dish.price * item.quantity, 1, 0)} + ' ₽'"></span>
+                        <span class="new-price"
+                              th:text="${#numbers.formatDecimal(item.quantity * item.dish.price * (1 - item.appliedDiscount), 1, 0)} + ' ₽'"></span>
+                    </div>
+                </div>
+
+                <div th:if="${item.comment != null and !item.comment.isEmpty()}" class="item-comment">
+                    <i class="far fa-comment-dots"></i>
+                    <span th:text="${item.comment}"></span>
+                </div>
+
+                <button class="remove-item-btn btn btn-danger" th:data-item-id="${item.id}">
+                    <i class="fas fa-trash-alt"></i> Убрать
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Пустая корзина -->
+    <div th:if="${orderItems == null or orderItems.isEmpty()}" class="empty-cart-block">
+        <i class="fas fa-shopping-basket"></i>
+        <p>Ваша корзина пока пуста</p>
+        <a th:href="@{/menu}" class="btn btn-primary">Перейти в меню</a>
+    </div>
+
+    <!-- 3. Итоговая карточка и действия -->
+    <div th:if="${orderItems != null and !orderItems.isEmpty()}" class="cart-summary-card">
+
+        <div class="summary-top">
+            <div class="total-info">
+                <span class="total-label">Итого к оплате:</span>
+                <div class="total-amount">
+                    <span th:if="${totalDiscounted < totalPrice}" class="total-old" th:text="${#numbers.formatDecimal(totalPrice, 1, 0)} + ' ₽'"></span>
+                    <span class="total-new" th:text="${#numbers.formatDecimal(totalDiscounted, 1, 0)} + ' ₽'"></span>
+                </div>
+            </div>
+
+            <div class="table-selection">
+                <label for="tableNumber">Номер вашего столика:</label>
+                <div class="input-with-icon">
+                    <i class="fas fa-utensils"></i>
+                    <input type="text" id="tableNumber" name="tableNumber" required placeholder="Сидим с бобром за столом..." value="">
+                </div>
+            </div>
+        </div>
+
+        <div class="summary-actions">
+            <button id="confirm-order-btn" class="btn btn-primary btn-lg">
+                <i class="fas fa-check-circle"></i> Подтвердить и заказать
+            </button>
+
+            <button id="cancel-order-btn" class="btn btn-danger" th:data-order-id="${order.id}">
+                <i class="fas fa-times"></i> Очистить корзину
             </button>
         </div>
     </div>
-    <div th:if="${orderItems == null or orderItems.isEmpty()}" class="empty-cart">
-        <p>Корзина пуста.</p>
-    </div>
 
-    <!-- Итоговая сумма -->
-    <div th:if="${not #lists.isEmpty(orderItems)}" class="total-price">
-        <p>Итог:
-            <span th:if="${totalDiscounted < totalPrice}" class="original-price" th:text="${#numbers.formatDecimal(totalPrice, 1, 2)} + ' ₽'"></span>
-            <span th:text="${#numbers.formatDecimal(totalDiscounted, 1, 2)} + ' ₽'"></span>
-        </p>
+    <div class="navigation-footer">
+        <a th:href="@{/menu}" class="btn btn-secondary">
+            <i class="fas fa-chevron-left"></i> Вернуться в меню
+        </a>
     </div>
-
-    <!-- Блок действий -->
-    <div th:if="${not #lists.isEmpty(orderItems)}" class="order-actions">
-        <div class="table-number-input">
-            <label for="tableNumber">Номер столика:</label>
-            <input type="text" id="tableNumber" name="tableNumber" required placeholder="Введите номер столика" value="">
-        </div>
-        <button id="confirm-order-btn" class="btn">Подтвердить заказ</button>
-        <button id="cancel-order-btn" class="btn" th:data-order-id="${order.id}">
-            <i class="fas fa-times"></i> Отменить заказ
-        </button>
-    </div>
-
-    <a th:href="@{/menu}" class="btn back-to-menu">Назад в меню</a>
 </div>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>

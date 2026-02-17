@@ -4,13 +4,15 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 0rem;
-    background-color: var(--color1); /* Светлый фон */
+    /* Добавляем отступы сверху и снизу */
+    padding: 1rem 0 4rem 0;
+    background-color: var(--color1);
+    min-height: 100vh; /* Чтобы фон был на весь экран */
 }
 
 h2 {
     font-size: 2.5rem;
-    color: var(--color5); /* Тёмный текст */
+    color: var(--color5);
     margin-bottom: 1.5rem;
 }
 
@@ -23,72 +25,79 @@ h2 {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
+/* Уменьшенный отступ между полями */
 .form-group {
-    margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
 }
 
 label {
     display: block;
     font-size: 1.1rem;
-    color: var(--color5); /* Тёмный текст */
-    margin-bottom: 0.5rem;
+    color: var(--color5);
+    margin-bottom: 0.3rem; /* Компактнее */
 }
 
-input[type="text"],
-input[type="password"],
-input[type="email"],
-input[type="date"],
-select {
+/* Скоупинг стилей (только внутри формы регистрации) */
+.register-form input[type="text"],
+.register-form input[type="password"],
+.register-form input[type="email"],
+.register-form input[type="date"],
+.register-form select {
     width: 100%;
-    max-width: 100%; /* Убираем ограничение ширины */
+    max-width: 100%;
     padding: 0.8rem;
-    border: 2px solid var(--color2); /* Средний оттенок */
+    border: 2px solid var(--color2);
     border-radius: 8px;
     font-size: 1rem;
     transition: border-color 0.3s ease;
-    box-sizing: border-box; /* Учитываем padding и border в ширине */
+    box-sizing: border-box;
 }
 
-input[type="text"]:focus,
-input[type="password"]:focus,
-input[type="email"]:focus,
-input[type="date"]:focus,
-select:focus {
-    border-color: var(--color5); /* Более тёмный оттенок при фокусе */
+.register-form input:focus,
+.register-form select:focus {
+    border-color: var(--color5);
+    outline: none;
 }
 
-.btn {
+/* Стили кнопки */
+.register-form .btn {
     width: 100%;
     padding: 0.8rem;
-    background-color: var(--color4); /* Тёмный оттенок */
-    color: var(--color0);
+    background-color: var(--color4);
+    color: var(--color1); /* Цвет текста как в Login */
     border: none;
     border-radius: 8px;
     font-size: 1.2rem;
     cursor: pointer;
     transition: all 0.3s ease;
-    box-sizing: border-box; /* Учитываем padding и border в ширине */
+    box-sizing: border-box;
 }
 
-.btn:hover {
-    background-color: var(--color3); /* Чуть светлее при наведении */
+.register-form .btn:hover {
+    background-color: var(--color3);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     transform: translateY(-2px);
 }
 
+/* Сообщение об ошибке под формой */
 .error-message {
-    background-color: #dc3545; /* Красный фон */
-    color: var(--color0);
+    background-color: #dc3545;
+    color: white; /* Белый текст читается лучше на красном */
     padding: 0.8rem;
     border-radius: 8px;
-    margin-top: 1rem;
+    margin-top: 1.0rem; /* Отступ от формы */
+    margin-bottom: 1.0rem;
     text-align: center;
+    width: 100%;
+    max-width: 400px; /* Чтобы не было шире формы */
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.2);
 }
 
-/* Адаптивность для мобильных устройств */
+/* Адаптивность */
 @media (max-width: 768px) {
     .register-container {
         padding: 1rem;
+        padding-bottom: 3rem;
     }
 
     h2 {
@@ -99,7 +108,7 @@ select:focus {
         padding: 1.5rem;
     }
 
-    .btn {
+    .register-form .btn {
         font-size: 1rem;
     }
 }

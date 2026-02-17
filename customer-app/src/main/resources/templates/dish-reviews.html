@@ -1,86 +1,127 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
-  <!-- Favicon -->
-  <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+    <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+    <title th:text="'Отзывы: ' + ${dish.name}">Отзывы на блюдо</title>
 
-  <title>Отзывы на блюдо</title>
-  <link rel="stylesheet" th:href="@{/css/common.css}">
-  <link rel="stylesheet" href="/css/dish-reviews.css">
-  <link rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
-        integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw=="
-        crossorigin="anonymous"
-        referrerpolicy="no-referrer" />
-
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" th:href="@{/css/common.css}">
+    <link rel="stylesheet" th:href="@{/css/dish-reviews.css}">
 </head>
 <body>
+
 <div th:replace="fragments/header :: header"></div>
 
-<div class="dish-info">
-  <h1 th:text="${dish.name}"></h1>
-  <img th:src="@{${dish.imagePath}}" alt="Фото блюда" class="dish-image">
-  <p th:text="${dish.description}"></p>
-  <div class="rating-summary">
-      <div class="rating-stars">
-        <i th:each="i : ${#numbers.sequence(1, 5)}"
-           th:classappend="${i <= dish.averageRating} ? 'fas fa-star' : 'far fa-star'"
-           style="color: #ffd700;"></i>
-      </div>
-    <span th:text="|${dish.getAverageRating()} (${dish.reviews.size()})|"></span>
-  </div>
-</div>
+<div class="main-container">
 
-<div th:if="${dish.composition}" class="composition">
-  <div class="composition-inner">
-    <h3>Состав</h3>
-    <ul>
-      <li th:each="ingredient : ${#strings.listSplit(dish.composition, ',')}"
-          th:text="${#strings.trim(ingredient)}"></li>
-    </ul>
-  </div>
-</div>
-
-<!-- Блок с весом -->
-<div class="weight-container">
-  <div th:if="${dish.weight}" class="weight-info">
-    <h3>Вес блюда</h3>
-    <p th:text="${dish.weight} + ' г'"></p>
-  </div>
-</div>
-
-<div class="review-form">
-  <h2>Оставить отзыв</h2>
-  <form th:action="@{/dish/{dishId}/reviews/add(dishId=${dish.id})}" method="post">
-    <input type="hidden" name="dishId" th:value="${dish.id}">
-    <div class="rating-input">
-      <span>Оценка:</span>
-      <div class="stars">
-        <i class="far fa-star" data-value="1"></i>
-        <i class="far fa-star" data-value="2"></i>
-        <i class="far fa-star" data-value="3"></i>
-        <i class="far fa-star" data-value="4"></i>
-        <i class="far fa-star" data-value="5"></i>
-      </div>
-      <input type="hidden" name="rating" id="ratingValue" value=data-value>
+    <!-- Кнопка возврата -->
+    <div class="top-navigation">
+        <a th:href="@{/menu}" class="btn btn-secondary btn-sm">
+            <i class="fas fa-chevron-left"></i> Назад в меню
+        </a>
     </div>
-    <textarea name="reviewText" placeholder="Ваш отзыв..." ></textarea>
-    <button type="submit">Опубликовать</button>
-  </form>
-</div>
 
-<div class="reviews-list">
-  <h2>Отзывы</h2>
-  <div th:each="review : ${dish.reviews}" class="review-item">
-    <div class="review-rating">
-      <span class="stars">
-          <i th:each="i : ${#numbers.sequence(1, 5)}"
-             th:class="${i <= review.rating} ? 'fas fa-star' : 'far fa-star'"></i>
-      </span>
+    <!-- 1. Главная карточка блюда -->
+    <div class="dish-presentation-card">
+        <div class="dish-visual">
+            <img th:src="@{${dish.imagePath}}" alt="Фото блюда" class="main-dish-img">
+            <div class="dish-weight" th:if="${dish.weight}">
+                <i class="fas fa-weight-hanging"></i> <span th:text="${dish.weight} + ' г'"></span>
+            </div>
+        </div>
+
+        <div class="dish-details">
+            <h1 th:text="${dish.name}">Название блюда</h1>
+
+            <div class="dish-stats-row">
+                <div class="stars-display">
+                    <i th:each="i : ${#numbers.sequence(1, 5)}"
+                       th:class="${i <= dish.averageRating} ? 'fas fa-star filled' : 'far fa-star'"></i>
+                </div>
+                <span class="rating-text" th:text="${dish.getAverageRating()} + ' / 5'"></span>
+                <span class="reviews-count" th:text="'(' + ${dish.reviews.size()} + ' отзывов)'"></span>
+            </div>
+
+            <p class="dish-desc" th:text="${dish.description}">Описание...</p>
+
+            <div th:if="${dish.composition}" class="dish-ingredients">
+                <h4>Состав:</h4>
+                <div class="tags">
+                    <span th:each="ingredient : ${#strings.listSplit(dish.composition, ',')}"
+                          class="tag" th:text="${#strings.trim(ingredient)}"></span>
+                </div>
+            </div>
+        </div>
     </div>
-    <p class="review-text" th:text="${review.reviewText}"></p>
-    <p class="review-author" th:text="|${review.client.fullName}, ${#temporals.format(review.reviewTime, 'dd.MM.yyyy HH:mm')}|"></p>
-  </div>
+
+    <!-- 2. Форма добавления отзыва -->
+    <div class="review-write-section" th:if="${#authorization.expression('isAuthenticated()')}">
+        <div class="card-header-simple">
+            <h2>Ваше мнение важно</h2>
+            <p>Пожалуйста, оцените блюдо и поделитесь впечатлениями</p>
+        </div>
+
+        <form th:action="@{/dish/{dishId}/reviews/add(dishId=${dish.id})}" method="post" id="reviewForm" class="review-form-styled">
+            <input type="hidden" name="dishId" th:value="${dish.id}">
+
+            <div class="rating-selector">
+                <span class="label">Оценка:</span>
+                <div class="stars-input">
+                    <i class="far fa-star" data-value="1"></i>
+                    <i class="far fa-star" data-value="2"></i>
+                    <i class="far fa-star" data-value="3"></i>
+                    <i class="far fa-star" data-value="4"></i>
+                    <i class="far fa-star" data-value="5"></i>
+                </div>
+                <input type="hidden" name="rating" id="ratingValue" required>
+            </div>
+
+            <div class="textarea-wrapper">
+                <textarea name="reviewText" placeholder="Что вам понравилось больше всего?" required></textarea>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-paper-plane"></i> Отправить отзыв
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="guest-login-promo" th:unless="${#authorization.expression('isAuthenticated()')}">
+        <p><a th:href="@{/login}">Войдите</a>, чтобы оставить свой отзыв.</p>
+    </div>
+
+    <!-- 3. Список отзывов -->
+    <div class="reviews-feed">
+        <h3 class="feed-title">Отзывы гостей</h3>
+
+        <div th:if="${dish.reviews.isEmpty()}" class="no-reviews-state">
+            <i class="fas fa-comment-slash"></i>
+            <p>Пока никто не оставил отзыв. Станьте первым!</p>
+        </div>
+
+        <div th:each="review : ${dish.reviews}" class="review-bubble">
+            <div class="bubble-header">
+                <div class="user-meta">
+                    <div class="avatar-small" th:text="${#strings.substring(review.client.fullName, 0, 1)}"></div>
+                    <div class="user-info">
+                        <strong th:text="${review.client.fullName}">Имя</strong>
+                        <span class="review-date" th:text="${#temporals.format(review.reviewTime, 'dd MMMM yyyy, HH:mm')}">Дата</span>
+                    </div>
+                </div>
+                <div class="stars-mini">
+                    <i th:each="i : ${#numbers.sequence(1, 5)}"
+                       th:class="${i <= review.rating} ? 'fas fa-star' : 'far fa-star'"></i>
+                </div>
+            </div>
+            <div class="bubble-content">
+                <p th:text="${review.reviewText}">Текст отзыва...</p>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>

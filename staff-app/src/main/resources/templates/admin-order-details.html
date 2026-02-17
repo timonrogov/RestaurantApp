@@ -1,105 +1,179 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.w3.org/1999/xhtml">
 <head>
-  <!-- Favicon -->
-  <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+    <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+    <meta charset="UTF-8">
+    <title>Детали заказа #<span th:text="${order.id}"></span></title>
 
-  <title>Детали заказа</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
-  <link rel="stylesheet" th:href="@{/css/common.css}">
-  <link rel="stylesheet" th:href="@{/css/admin-order-details.css}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" th:href="@{/css/common.css}">
+    <link rel="stylesheet" th:href="@{/css/admin-order-details.css}">
 </head>
 <body>
+
 <div th:replace="fragments/header :: header"></div>
 
-<div class="container">
-  <!-- Основная информация о заказе -->
-  <h1>Заказ №<span th:text="${order.id}"></span></h1>
-  <p>Статус: <span th:text="${order.status.getDisplayName()}"></span></p>
-  <p>Дата и время:
-    <span th:text="${#temporals.format(order.timeSlot.day.workDate, 'dd.MM.yyyy')}"></span>
-    <span th:text="${order.timeSlot.orderTime}"></span>
-  </p>
-  <p>Номер столика: <span th:text="${order.tableNumber}"></span></p>
+<div class="main-container">
 
-
-    <!-- Вариант 1: Если клиент зарегистрирован (не null) -->
-    <div class="client-info" th:if="${client != null}">
-        <h2>Информация о клиенте:</h2>
-        <p>Имя пользователя: <span th:text="${client.account.username}"></span></p>
-        <p>Полное имя: <span th:text="${client.fullName}"></span></p>
-        <p>Телефон: <span th:text="${client.phone}"></span></p>
-        <p>Email: <span th:text="${client.email}"></span></p>
-        <p>Пол: <span th:text="${client.gender}"></span></p>
-        <p>Дата рождения:
-            <span th:if="${client.dateOfBirth != null}" th:text="${#temporals.format(client.dateOfBirth, 'dd.MM.yyyy')}"></span>
-            <span th:if="${client.dateOfBirth == null}">Не указана</span>
-        </p>
+    <!-- Верхняя навигация -->
+    <div class="details-header">
+        <a th:href="@{/admin/orders}" class="btn-back-link">
+            <i class="fas fa-arrow-left"></i> К списку заказов
+        </a>
+        <h1>Заказ #<span th:text="${order.id}"></span></h1>
     </div>
 
-    <!-- Вариант 2: Если это Гость (client == null) -->
-    <div class="client-info" th:if="${client == null}">
-        <h2>Информация о клиенте:</h2>
-        <p style="font-size: 1.2rem; font-weight: bold; color: var(--color3);">
-            <i class="fas fa-user-secret"></i> Гость (Незарегистрированный пользователь)
-        </p>
-        <p>Заказ оформлен без авторизации.</p>
+    <div class="details-grid">
+
+        <!-- ЛЕВАЯ КОЛОНКА: Состав заказа -->
+        <div class="left-column">
+            <div class="items-card">
+                <div class="card-title">
+                    <i class="fas fa-utensils"></i> Состав заказа
+                </div>
+
+                <table class="order-items-table">
+                    <thead>
+                    <tr>
+                        <th>Блюдо</th>
+                        <th class="text-center">Цена</th>
+                        <th class="text-center">Кол-во</th>
+                        <th class="text-right">Сумма</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="item : ${orderItems}">
+                        <td>
+                            <div class="dish-cell">
+                                <img th:src="${item.dish.imagePath != null} ? @{${item.dish.imagePath}} : @{/images/placeholder.jpg}"
+                                     alt="Фото" class="dish-thumb">
+                                <div class="dish-info">
+                                    <span class="dish-name" th:text="${item.dish.name}">Название</span>
+                                    <span class="dish-comment" th:if="${item.comment != null}"
+                                          th:text="${item.comment}"></span>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="text-center">
+                            <div class="price-cell">
+                                    <span th:if="${item.appliedDiscount > 0}" class="old-price"
+                                          th:text="${#numbers.formatDecimal(item.dish.price, 1, 0)}"></span>
+                                <span th:text="${#numbers.formatDecimal(item.dish.price * (1 - item.appliedDiscount), 1, 0)} + ' ₽'"></span>
+                            </div>
+                        </td>
+                        <td class="text-center" th:text="${item.quantity}">1</td>
+                        <td class="text-right font-bold"
+                            th:text="${#numbers.formatDecimal(item.dish.price * (1 - item.appliedDiscount) * item.quantity, 1, 0)} + ' ₽'">
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+
+                <div class="order-total-section">
+                    <span class="total-label">Итого к оплате:</span>
+                    <span class="total-value" th:text="${#numbers.formatDecimal(order.totalPrice, 1, 0)} + ' ₽'"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ПРАВАЯ КОЛОНКА: Инфо и Действия -->
+        <div class="right-column">
+
+            <!-- Карточка Статуса -->
+            <div class="info-card status-card">
+                <div class="status-indicator"
+                     th:classappend="'status-' + ${order.status.name().toLowerCase()}">
+                    <i class="fas" th:classappend="${order.status.name() == 'COOKING'} ? 'fa-fire' :
+                                                 (${order.status.name() == 'READY'} ? 'fa-bell' :
+                                                 (${order.status.name() == 'SERVED'} ? 'fa-check-circle' : 'fa-times-circle'))"></i>
+                    <span th:text="${order.status.displayName}">Статус</span>
+                </div>
+
+                <div class="meta-row">
+                    <div class="meta-item">
+                        <span class="label">Дата</span>
+                        <span class="value" th:text="${#temporals.format(order.timeSlot.day.workDate, 'dd.MM.yyyy')}"></span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="label">Время</span>
+                        <span class="value" th:text="${#temporals.format(order.timeSlot.orderTime, 'HH:mm')}"></span>
+                    </div>
+                </div>
+
+                <div class="table-info" th:if="${order.tableNumber != null}">
+                    <span class="label">Столик</span>
+                    <span class="table-val" th:text="${order.tableNumber}"></span>
+                </div>
+            </div>
+
+            <!-- Карточка Клиента -->
+            <div class="info-card client-card">
+                <div class="card-title"><i class="fas fa-user"></i> Клиент</div>
+
+                <!-- Авторизованный -->
+                <div th:if="${client != null}" class="client-details">
+                    <div class="client-avatar" th:text="${#strings.substring(client.fullName, 0, 1)}"></div>
+                    <div class="client-text">
+                        <strong th:text="${client.fullName}">Имя</strong>
+                        <a th:href="'tel:' + ${client.phone}" class="client-phone" th:text="${client.phone}"></a>
+                        <span class="client-login" th:text="'@' + ${client.account.username}"></span>
+                    </div>
+                </div>
+
+                <!-- Гость -->
+                <div th:if="${client == null}" class="guest-details">
+                    <div class="guest-icon"><i class="fas fa-user-secret"></i></div>
+                    <div class="guest-text">
+                        <strong>Гость</strong>
+                        <span>Заказ без регистрации</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Карточка Действий -->
+            <div class="info-card actions-card"
+                 th:if="${order.status.name() != 'SERVED' and order.status.name() != 'CANCELED'}">
+                <div class="card-title">Действия</div>
+
+                <div class="actions-list">
+                    <!-- Повар: Готовится -> Готов -->
+                    <form th:if="${order.status.name() == 'COOKING'}"
+                          th:action="@{/admin/orders/{id}/status(id=${order.id})}"
+                          method="post" sec:authorize="hasAnyRole('COOK', 'ADMIN')">
+                        <input type="hidden" name="newStatus" value="READY">
+                        <button type="submit" class="btn btn-primary btn-block">
+                            <i class="fas fa-bell"></i> Заказ готов
+                        </button>
+                    </form>
+
+                    <!-- Официант: Готов -> Подан -->
+                    <form th:if="${order.status.name() == 'READY'}"
+                          th:action="@{/admin/orders/{id}/status(id=${order.id})}"
+                          method="post" sec:authorize="hasAnyRole('WAITER', 'ADMIN')">
+                        <input type="hidden" name="newStatus" value="SERVED">
+                        <button type="submit" class="btn btn-success btn-block">
+                            <i class="fas fa-check"></i> Заказ подан
+                        </button>
+                    </form>
+
+                    <!-- Админ: Отмена -->
+                    <form th:action="@{/admin/orders/{id}/status(id=${order.id})}"
+                          method="post" sec:authorize="hasRole('ADMIN')">
+                        <input type="hidden" name="newStatus" value="CANCELED">
+                        <button type="submit" class="btn btn-outline-danger btn-block"
+                                onclick="return confirm('Вы уверены?')">
+                            Отменить заказ
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+        </div>
     </div>
-
-
-
-    <!-- Список блюд -->
-  <h2>Состав заказа:</h2>
-  <table class="order-items">
-    <tr>
-      <th>Изображение</th>
-      <th>Название</th>
-      <th>Количество</th>
-      <th>Комментарий</th>
-      <th>Цена</th>
-      <th>Сумма</th>
-    </tr>
-    <tr th:each="item : ${orderItems}">
-      <td>
-        <img th:src="@{${item.dish.imagePath}}"
-             alt="Фото блюда"
-             class="dish-image-small">
-      </td>
-      <td th:text="${item.dish.name}"></td>
-      <td th:text="${item.quantity}"></td>
-      <td th:text="${item.comment} ?: 'Нет комментария'"></td>
-      <td>
-                <span th:if="${item.appliedDiscount > 0}"
-                      style="text-decoration: line-through;"
-                      th:text="${#numbers.formatDecimal(item.dish.price, 0, 'COMMA', 2, 'POINT')}">
-                </span>
-        <span th:text="${#numbers.formatDecimal(item.dish.price * (1 - item.appliedDiscount), 0, 'COMMA', 2, 'POINT')}">
-                </span> ₽
-      </td>
-      <td th:text="${#numbers.formatDecimal(item.dish.price * (1 - item.appliedDiscount) * item.quantity, 0, 'COMMA', 2, 'POINT')}">
-      </td>
-    </tr>
-  </table>
-
-  <!-- Кнопки управления статусом -->
-  <div class="order-actions" th:if="${currentStatus == 'COOKING'}">
-    <form th:action="@{/admin/orders/{id}/status(id=${order.id})}" method="post">
-      <input type="hidden" name="newStatus" value="SERVED">
-      <button type="submit" class="btn-success">Подать заказ</button>
-    </form>
-
-    <form th:action="@{/admin/orders/{id}/status(id=${order.id})}" method="post">
-      <input type="hidden" name="newStatus" value="CANCELED">
-      <button type="submit" class="btn-danger">Отменить заказ</button>
-    </form>
-  </div>
-
-  <a href="/admin/orders" class="btn">Вернуться к списку заказов</a>
 </div>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
 <script th:src="@{/js/common.js}"></script>
-<script th:src="@{/js/admin-order-details.js}"></script>
 </body>
 </html>

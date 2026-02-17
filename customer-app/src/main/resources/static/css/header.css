@@ -1,0 +1,345 @@
+/* header.css */
+
+@import url('https://fonts.googleapis.com/css2?family=Lobster&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&display=swap');
+
+header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--header-height);
+    background-color: var(--color5); /* Темный основной цвет */
+    color: var(--color0);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+}
+
+.header-nav a,
+.call-waiter-btn,
+.btn-login-header,
+.profile-info,
+.btn-logout span {
+    font-family: 'Playfair Display', serif !important;
+}
+
+.header-content {
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 30px;
+}
+
+.header-wrapper {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* === ЛЕВАЯ ЧАСТЬ: БРЕНД И НАВИГАЦИЯ === */
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 30px;
+}
+
+.brand-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+    transition: transform 0.3s ease;
+}
+
+.brand-group:hover {
+    transform: scale(1.02);
+}
+
+.header-logo-img {
+    height: 50px;
+    width: auto;
+    border-radius: 8px;
+    /*border: 1px solid var(--color2);
+    background: white;*/
+}
+
+.brand-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.brand-name {
+    font-family: 'Lobster', cursive;
+    font-weight: 100;
+    font-size: 1.5rem;
+    color: var(--color1);
+    line-height: 1.1;
+}
+
+.brand-tagline {
+    font-size: 0.7rem;
+    color: var(--color2);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 600;
+    font-family: 'Playfair Display', serif;
+}
+
+/* Навигация (общая для всех) */
+.header-nav {
+    display: flex;
+    gap: 5px;
+}
+
+.nav-item-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    color: var(--color1);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.9rem;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.nav-item-link i {
+    font-size: 1rem;
+    color: var(--color2);
+    transition: color 0.3s;
+}
+
+.nav-item-link:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: white;
+    transform: translateY(-2px);
+}
+
+.nav-item-link:hover i {
+    color: var(--color3);
+}
+
+/* === ПРАВАЯ ЧАСТЬ === */
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+/* === Правка для выравнивания всех кнопок в правой части === */
+.visitor-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px; /* Расстояние между "Мой заказ" и "Официант" */
+}
+
+/* === Кнопка "Мой заказ" (Корзина) === */
+.cart-btn {
+    background-color: rgba(255, 255, 255, 0.05); /* Легкий фон, как у профиля */
+    border: 1px solid var(--color2); /* Бежевая рамка */
+    color: var(--color1);
+    padding: 6px 16px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-family: 'Playfair Display', serif;
+    font-weight: 600;
+    font-size: 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+    text-decoration: none;
+}
+
+.cart-btn i {
+    font-size: 1rem;
+    color: var(--color2); /* Иконка чуть бледнее текста */
+    transition: color 0.3s ease;
+}
+
+.cart-btn:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: var(--color3); /* Подсветка рыжим при наведении */
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.cart-btn:hover i {
+    color: var(--color3); /* Иконка становится рыжей */
+}
+
+/* Круглая кнопка для Корзины и Выхода */
+.nav-icon-btn, .btn-logout {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background: transparent;
+    border: 1px solid var(--color2);
+    color: var(--color1);
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    text-decoration: none;
+}
+
+.nav-icon-btn:hover, .btn-logout:hover {
+    background: var(--color3);
+    border-color: var(--color3);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(159, 87, 39, 0.3);
+}
+
+/* Кнопка вызова официанта (Рыжая рамка) */
+.call-waiter-btn {
+    background-color: transparent;
+    border: 2px solid var(--color3);
+    color: var(--color1);
+    padding: 6px 16px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-family: 'Playfair Display', serif;
+    font-weight: 600;
+    font-size: 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+}
+
+.call-waiter-btn:hover {
+    background-color: var(--color3);
+    color: white;
+    box-shadow: 0 0 12px rgba(159, 87, 39, 0.6);
+    transform: translateY(-2px);
+}
+
+.call-waiter-btn:hover i {
+    animation: bell-shake 1.0s ease-in-out;
+}
+
+/* Профиль (Пилюля) */
+.user-controls {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.profile-pill {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 4px 4px 14px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(212, 174, 138, 0.2);
+    border-radius: 30px;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.profile-pill:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--color3);
+    transform: translateY(-2px);
+}
+
+.profile-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.u-name {
+    color: white;
+    font-weight: 700;
+    font-size: 0.85rem;
+    line-height: 1;
+    font-family: 'Playfair Display', serif;
+}
+
+.u-role {
+    color: var(--color2);
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    font-weight: 700;
+    font-family: 'Playfair Display', serif;
+}
+
+.profile-icon {
+    width: 34px;
+    height: 34px;
+    background: var(--color2);
+    color: var(--color5);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    transition: all 0.3s;
+}
+
+.profile-pill:hover .profile-icon {
+    background: var(--color3);
+    color: white;
+}
+
+/* Кнопка "Войти" */
+.btn-login-header {
+    background: var(--color3);
+    color: white;
+    padding: 8px 24px;
+    border-radius: 25px;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+}
+
+.btn-login-header:hover {
+    background: var(--color4);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(159, 87, 39, 0.4);
+}
+
+@keyframes bell-shake {
+    0%, 100% { transform: rotate(0); }
+    15% { transform: rotate(15deg); }
+    30% { transform: rotate(-15deg); }
+    45% { transform: rotate(10deg); }
+    60% { transform: rotate(-10deg); }
+    75% { transform: rotate(5deg); }
+    85% { transform: rotate(-5deg); }
+}
+
+/* Адаптивность */
+@media (max-width: 1100px) {
+    .brand-text, .nav-item-link span {
+        display: none; /* Скрываем текст, оставляем иконки */
+    }
+    .header-left { gap: 20px; }
+}
+
+@media (max-width: 768px) {
+    .header-content { padding: 0 15px; }
+    .header-nav { display: none; } /* Можно потом сделать бургер-меню */
+    .brand-text { display: flex; } /* Возвращаем название бренда */
+
+    .call-waiter-btn .call-text { display: none; }
+    .call-waiter-btn {
+        padding: 0;
+        width: 40px;
+        height: 40px;
+        justify-content: center;
+        border-radius: 50%;
+    }
+}

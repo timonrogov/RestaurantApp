@@ -1,90 +1,186 @@
 /* index.css */
 
-/* Подключаем шрифт Lobster */
 @import url('https://fonts.googleapis.com/css2?family=Lobster&display=swap');
 
-/* Стили для основного контейнера */
 .main-container {
-    text-align: center;
-    padding: 2rem;
-    background-color: var(--color1);
+    padding-top: 2rem;
+    padding-bottom: 5rem;
 }
 
-/* Стили для названия ресторана */
+/* === 1. Hero Секция === */
+.hero-section {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 50px;
+    background-color: var(--color0);
+    padding: 4rem;
+    border-radius: 30px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+    margin-bottom: 4rem;
+    border-bottom: 5px solid var(--color3);
+}
+
+.hero-content {
+    flex: 1;
+}
+
 .restaurant-title {
     font-family: 'Lobster', cursive;
-    font-size: 4rem;
+    font-weight: 100;
+    font-size: 4.5rem;
     color: var(--color4);
-    margin-bottom: 0rem;
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1); /* Лёгкая тень для объёма */
+    margin-bottom: 0.5rem;
+    line-height: 1.1;
 }
 
-/* Стили для изображения */
-.restaurant-logo {
-    width: 500px;
+.hero-subtitle {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.5rem;
+    color: var(--color3);
+    font-style: italic;
+    margin-bottom: 2rem;
+}
+
+.hero-info {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 2.5rem;
+}
+
+.info-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--color4);
+    font-weight: 500;
+}
+
+.info-item i {
+    color: var(--color3);
+    width: 20px;
+}
+
+.btn-lg {
+    padding: 1rem 2.5rem !important;
+    font-size: 1.2rem !important;
+}
+
+.hero-image-wrapper {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+}
+
+.hero-img {
+    width: 100%;
+    max-width: 500px;
     height: auto;
-    margin-bottom: 0.5rem;
-    border-radius: 10px; /* Закругленные углы */
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); /* Тень для глубины */
+    border-radius: 20px;
+    box-shadow: 20px 20px 60px rgba(0,0,0,0.1);
+    transform: rotate(2deg);
+    transition: transform 0.5s ease;
 }
 
-/* Стили для заголовка */
-h1 {
-    font-size: 2.5rem;
+.hero-section:hover .hero-img {
+    transform: rotate(0deg) scale(1.02);
+}
+
+/* === 2. Карточки действий === */
+.quick-actions {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 30px;
+    margin-bottom: 5rem;
+}
+
+.action-card {
+    background: var(--color0);
+    padding: 3rem 2rem;
+    border-radius: 20px;
+    text-align: center;
+    border: 1px solid var(--color2);
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.action-card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 15px 35px rgba(159, 87, 39, 0.15);
+    border-color: var(--color3);
+}
+
+.action-card i {
+    font-size: 3rem;
+    color: var(--color3);
+    margin-bottom: 1.5rem;
+}
+
+.action-card h3 {
     margin-bottom: 1rem;
-    margin-top: 0.5rem;
 }
 
-/* Стили для текста */
-p {
-    font-size: 1.2rem;
+.action-card p {
+    font-size: 0.95rem;
+    margin-bottom: 2rem;
+    color: var(--color4);
+    flex-grow: 1;
+}
+
+/* === 3. Преимущества === */
+.features-section {
+    display: flex;
+    justify-content: space-around;
+    gap: 40px;
+    padding: 2rem 0;
+    border-top: 1px solid var(--color2);
+}
+
+.feature {
+    text-align: center;
+    max-width: 250px;
+}
+
+.feature-icon {
+    font-size: 2rem;
+    color: var(--color3);
+    margin-bottom: 1rem;
+}
+
+.feature h4 {
     margin-bottom: 0.5rem;
-}
-
-/* Стили для ссылки на меню */
-.menu-link {
-    display: inline-block;
-    padding: 0.8rem 1.5rem;
-    background-color: var(--color3); /* Тёплый оранжевый цвет */
-    color: white;
-    text-decoration: none;
-    border-radius: 8px;
-    transition: all 0.3s ease; /* Плавные эффекты */
     font-size: 1.2rem;
-    margin-top: 1rem;
 }
 
-.menu-link:hover {
-    background-color: var(--color4); /* Более тёмный оттенок при наведении */
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    transform: translateY(-2px); /* Лёгкий подъём */
+.feature p {
+    font-size: 0.85rem;
+    color: var(--color2);
 }
 
-.toast-custom.toast-error {
-    background-color: var(--error);
-    color: white;
+/* === Адаптивность === */
+@media (max-width: 1024px) {
+    .hero-section {
+        flex-direction: column;
+        text-align: center;
+        padding: 2rem;
+    }
+    .hero-info {
+        align-items: center;
+    }
+    .quick-actions {
+        grid-template-columns: 1fr;
+    }
 }
 
-/* Адаптивность для мобильных устройств */
 @media (max-width: 768px) {
     .restaurant-title {
         font-size: 3rem;
     }
-
-    .restaurant-logo {
-        width: 200px;
-    }
-
-    h1 {
-        font-size: 2rem;
-    }
-
-    p {
-        font-size: 1rem;
-    }
-
-    .menu-link {
-        font-size: 1rem;
-        padding: 0.6rem 1.2rem;
+    .features-section {
+        flex-direction: column;
+        align-items: center;
     }
 }

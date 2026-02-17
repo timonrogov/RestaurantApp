@@ -1,38 +1,13 @@
 /* admin-calls.css */
 
-/* === 1. Бейдж уведомлений в шапке (глобальный) === */
-.notification-badge {
-    position: absolute;
-    top: -8px;
-    right: -12px;
-    background-color: var(--error); /* Красный цвет для привлечения внимания */
-    color: white;
-    font-size: 0.7rem;
-    font-weight: bold;
-    min-width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 2px;
-    border: 2px solid var(--color5); /* Обводка под цвет фона шапки для контраста */
-    animation: bounceIn 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-}
-
-@keyframes bounceIn {
-    0% { transform: scale(0); }
-    100% { transform: scale(1); }
-}
-
-/* === 2. Верхняя панель страницы === */
+/* === 1. Заголовок и кнопка обновления === */
 .page-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 2rem;
-    border-bottom: 2px solid var(--color2);
     padding-bottom: 1rem;
+    border-bottom: 1px solid var(--color2);
 }
 
 .page-header h1 {
@@ -41,84 +16,63 @@
 }
 
 .btn-refresh {
-    background: transparent;
-    border: 2px solid var(--color3);
+    background: white;
+    border: 1px solid var(--color3);
     color: var(--color3);
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
+    padding: 8px 20px;
+    border-radius: 20px;
     cursor: pointer;
-    transition: all 0.3s ease;
+    font-weight: 600;
     display: flex;
     align-items: center;
-    justify-content: center;
+    gap: 8px;
+    transition: all 0.3s ease;
 }
 
 .btn-refresh:hover {
     background: var(--color3);
-    color: var(--color0);
+    color: white;
+}
+
+.btn-refresh i {
+    transition: transform 0.5s ease;
+}
+
+.btn-refresh:hover i {
     transform: rotate(180deg);
 }
 
-/* === 3. Сетка вызовов === */
+/* === 2. Сетка === */
 .calls-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 25px;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 30px;
 }
 
-/* Состояние "Нет вызовов" */
-.no-calls {
-    grid-column: 1 / -1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 4rem;
-    background-color: rgba(40, 167, 69, 0.1); /* Светло-зеленый фон */
-    border: 2px dashed var(--success);
-    border-radius: 12px;
-    color: var(--success);
-}
-
-.no-calls i {
-    font-size: 3rem;
-    margin-bottom: 1rem;
-}
-
-.no-calls p {
-    font-size: 1.2rem;
-    font-weight: 500;
-}
-
-/* === 4. Карточка вызова === */
+/* === 3. Карточка вызова === */
 .call-card {
     background-color: var(--color0);
-    border-radius: 12px;
+    border-radius: 16px;
     overflow: hidden;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
     display: flex;
     flex-direction: column;
     transition: transform 0.3s ease;
+    border: 1px solid var(--color2);
 
-    /* Анимация пульсации границы для привлечения внимания */
-    border: 2px solid transparent;
-    animation: pulse-border 2s infinite;
+    /* Анимация пульсации для привлечения внимания */
+    animation: pulse-shadow 2s infinite;
 }
 
-@keyframes pulse-border {
-    0% { border-color: rgba(159, 87, 39, 0.3); box-shadow: 0 0 0 0 rgba(159, 87, 39, 0.2); }
-    50% { border-color: var(--color3); box-shadow: 0 0 10px 0 rgba(159, 87, 39, 0.4); }
-    100% { border-color: rgba(159, 87, 39, 0.3); box-shadow: 0 0 0 0 rgba(159, 87, 39, 0); }
+@keyframes pulse-shadow {
+    0% { box-shadow: 0 4px 15px rgba(159, 87, 39, 0.1); }
+    50% { box-shadow: 0 4px 25px rgba(159, 87, 39, 0.4); transform: translateY(-2px); }
+    100% { box-shadow: 0 4px 15px rgba(159, 87, 39, 0.1); }
 }
 
-.call-card:hover {
-    transform: translateY(-5px);
-}
-
-/* Шапка карточки (Номер стола) */
+/* Шапка (Номер стола) */
 .call-header {
-    background-color: var(--color4);
+    background-color: var(--color4); /* Темно-коричневый */
     color: var(--color0);
     padding: 1.5rem;
     text-align: center;
@@ -126,20 +80,22 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-}
-
-.table-number {
-    font-size: 3rem;
-    font-weight: 700;
-    line-height: 1;
+    border-bottom: 4px solid var(--color3); /* Рыжая полоса */
 }
 
 .table-label {
     text-transform: uppercase;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     letter-spacing: 2px;
     opacity: 0.8;
-    margin-top: 5px;
+    margin-bottom: 5px;
+}
+
+.table-number {
+    font-family: 'Playfair Display', serif;
+    font-size: 3.5rem;
+    font-weight: 700;
+    line-height: 1;
 }
 
 /* Тело карточки */
@@ -151,56 +107,138 @@
     gap: 15px;
 }
 
-.client-info, .time-info {
+.info-row {
     display: flex;
     align-items: center;
-    gap: 12px;
-    font-size: 1.1rem;
+    gap: 15px;
     color: var(--color5);
 }
 
-.client-info i, .time-info i {
-    width: 20px;
-    text-align: center;
+.info-row i {
+    font-size: 1.2rem;
     color: var(--color3);
+    width: 24px;
+    text-align: center;
+}
+
+.client-row {
+    font-weight: 600;
+    font-size: 1.1rem;
+    padding-bottom: 10px;
+    border-bottom: 1px dashed var(--color2);
+}
+
+/* Блок времени */
+.time-data {
+    display: flex;
+    flex-direction: column;
+}
+
+.exact-time {
+    font-weight: 700;
+    font-size: 1.1rem;
 }
 
 .time-ago {
-    font-size: 0.9rem;
-    color: #777; /* Серый цвет для второстепенной инфы */
-    margin-left: auto;
+    font-size: 0.85rem;
+    color: #777;
+    /* Цвета для JS будут применяться инлайново, но базу зададим */
 }
 
 /* Футер (Кнопка) */
 .call-footer {
-    padding: 1rem;
-    border-top: 1px solid var(--color1);
-    background-color: rgba(238, 226, 214, 0.3);
+    padding: 1rem 1.5rem;
+    background-color: rgba(238, 226, 214, 0.2);
+    border-top: 1px solid var(--color2);
 }
 
 .btn-accept {
     width: 100%;
     padding: 12px;
-    background-color: var(--success);
+    background-color: var(--success); /* Зеленый - действие "ОК" */
     color: white;
     border: none;
     border-radius: 8px;
-    font-size: 1.1rem;
+    font-size: 1rem;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.3s ease;
-    text-transform: uppercase;
-    letter-spacing: 1px;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    box-shadow: 0 4px 10px rgba(40, 167, 69, 0.2);
 }
 
 .btn-accept:hover {
     background-color: #218838;
-    box-shadow: 0 4px 10px rgba(40, 167, 69, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(40, 167, 69, 0.3);
+}
+
+/* === 4. Пустое состояние === */
+.no-calls-state {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 5rem 2rem;
+    background: var(--color0);
+    border-radius: 20px;
+    border: 2px dashed var(--color2);
+    color: var(--color4);
+}
+
+.icon-box {
+    width: 80px;
+    height: 80px;
+    background-color: var(--color1);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+}
+
+.icon-box i {
+    font-size: 2.5rem;
+    color: var(--color3);
+}
+
+.no-calls-state h3 {
+    margin-bottom: 0.5rem;
+}
+
+/* === 5. Бейдж уведомлений в шапке (для header.html) === */
+.notification-badge {
+    position: absolute;
+    top: -5px;
+    right: -10px;
+    background-color: var(--error);
+    color: white;
+    font-size: 0.7rem;
+    font-weight: bold;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--color5);
+    animation: bounceIn 0.3s;
+}
+
+@keyframes bounceIn {
+    0% { transform: scale(0); }
+    100% { transform: scale(1); }
 }
 
 /* Адаптивность */
 @media (max-width: 576px) {
     .calls-grid {
-        grid-template-columns: 1fr; /* Одна колонка на телефоне */
+        grid-template-columns: 1fr;
+    }
+
+    .page-header {
+        flex-direction: column;
+        gap: 15px;
     }
 }

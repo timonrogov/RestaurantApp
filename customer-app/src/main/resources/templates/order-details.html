@@ -1,58 +1,132 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
-  <!-- Favicon -->
-  <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+    <!-- Favicon -->
+    <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
 
-  <title>Детали заказа</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
-  <link rel="stylesheet" th:href="@{/css/common.css}">
-  <link rel="stylesheet" th:href="@{/css/order-details.css}">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <title>Детали заказа</title>
+
+    <!-- Подключаем общие стили -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" th:href="@{/css/common.css}">
+
+    <!-- Стили конкретно для этой страницы -->
+    <link rel="stylesheet" th:href="@{/css/order-details.css}">
 </head>
 <body>
+
+<!-- Шапка сайта -->
 <div th:replace="fragments/header :: header"></div>
 
 <div class="main-container">
-  <h1>Заказ № <span th:text="${order.id}"></span></h1>
-  <div class="order-info">
-    <p><strong>Статус:</strong> <span th:text="${order.status.getDisplayName()}"></span></p>
-    <p><strong>Дата:</strong> <span th:text="${#temporals.format(order.timeSlot.day.workDate, 'dd.MM.yyyy')}"></span></p>
-    <p><strong>Время:</strong> <span th:text="${#temporals.format(order.timeSlot.orderTime, 'HH:mm')}"></span></p>
-  </div>
 
-  <!-- Список блюд в виде карточек -->
-  <div class="order-items">
-    <div th:each="item : ${orderItems}" class="order-item">
-      <img th:if="${item.dish.imagePath != null}" th:src="@{${item.dish.imagePath}}" alt="Фото блюда" class="dish-image"/>
-      <img th:unless="${item.dish.imagePath != null}" th:src="@{/static/images/placeholder.jpg}" alt="Фото блюда" class="dish-image"/>
-      <div class="dish-info">
-        <h3 th:text="${item.dish.name}"></h3>
-        <p>Количество: <span th:text="${item.quantity}"></span></p>
-        <p th:if="${item.comment != ''}">Комментарий: <span th:text="${item.comment != null} ? ${item.comment} : 'Нет'"></span></p>
-        <p>Цена:
-          <span th:if="${item.appliedDiscount > 0}" class="original-price" th:text="${#numbers.formatDecimal(item.dish.price, 1, 2)} + ' ₽'"></span>
-          <span th:text="${#numbers.formatDecimal(item.dish.price * (1 - item.appliedDiscount), 1, 2)} + ' ₽'"></span>
-        </p>
-        <p>Сумма: <span th:text="${#numbers.formatDecimal(item.quantity * item.dish.price * (1 - item.appliedDiscount), 1, 2)} + ' ₽'"></span></p>
-      </div>
+    <!-- 1. Верхняя карточка с информацией о заказе -->
+    <div class="order-header-card">
+        <div class="header-top">
+            <h1>Заказ №<span th:text="${order.id}"></span></h1>
+
+            <!-- Статус в виде бейджа (класс зависит от статуса для раскраски в CSS) -->
+            <span class="status-badge"
+                  th:classappend="'status-' + ${order.status.name().toLowerCase()}"
+                  th:text="${order.status.getDisplayName()}">
+        </span>
+        </div>
+
+        <div class="header-meta">
+            <div class="meta-item">
+                <i class="far fa-calendar-alt"></i>
+                <span th:text="${#temporals.format(order.timeSlot.day.workDate, 'dd.MM.yyyy')}"></span>
+            </div>
+            <div class="meta-item">
+                <i class="far fa-clock"></i>
+                <span th:text="${#temporals.format(order.timeSlot.orderTime, 'HH:mm')}"></span>
+            </div>
+            <div class="meta-item" th:if="${order.tableNumber != null and order.tableNumber != '0'}">
+                <i class="fas fa-utensils"></i>
+                <span>Столик №<span th:text="${order.tableNumber}"></span></span>
+            </div>
+        </div>
     </div>
-  </div>
 
-  <!-- Итоговая сумма -->
-  <div class="total-price">
-    <p>Итог:
-      <span th:if="${totalDiscounted != null and totalDiscounted < totalPrice}" class="original-price" th:text="${#numbers.formatDecimal(totalPrice, 1, 2)} + ' ₽'"></span>
-      <span th:text="${#numbers.formatDecimal(totalDiscounted, 1, 2)} + ' ₽'"></span>
-    </p>
-  </div>
+    <!-- 2. Сетка с блюдами -->
+    <div class="order-items-grid">
+        <div th:each="item : ${orderItems}" class="order-item-card">
 
-  <a th:href="@{/orders}" class="btn back-to-orders">К заказам</a>
+            <!-- Изображение -->
+            <div class="card-image-wrapper">
+                <img th:if="${item.dish.imagePath != null}"
+                     th:src="@{${item.dish.imagePath}}"
+                     alt="Фото блюда" class="dish-image"/>
+                <img th:unless="${item.dish.imagePath != null}"
+                     th:src="@{/images/placeholder.jpg}"
+                     alt="Фото блюда" class="dish-image"/>
+            </div>
+
+            <div class="card-content">
+                <h3 th:text="${item.dish.name}">Название блюда</h3>
+
+                <!-- Количество -->
+                <div class="item-quantity">
+                    <span class="qty-label">Количество:</span>
+                    <span class="qty-value" th:text="${item.quantity} + ' шт.'"></span>
+                </div>
+
+                <!-- Комментарий (если есть) -->
+                <div th:if="${item.comment != null and !item.comment.isEmpty()}" class="item-comment">
+                    <i class="far fa-comment-dots"></i>
+                    <span th:text="${item.comment}"></span>
+                </div>
+
+                <!-- Цены -->
+                <div class="item-pricing">
+                    <!-- Цена за единицу -->
+                    <div class="price-single">
+                <span th:if="${item.appliedDiscount > 0}"
+                      class="original-price"
+                      th:text="${#numbers.formatDecimal(item.dish.price, 1, 0)}"></span>
+                        <span class="current-price"
+                              th:text="${#numbers.formatDecimal(item.dish.price * (1 - item.appliedDiscount), 1, 0)} + ' ₽'"></span>
+                        <span class="price-label">/ шт.</span>
+                    </div>
+
+                    <!-- Итого за позицию -->
+                    <div class="price-total">
+                        <span th:text="${#numbers.formatDecimal(item.quantity * item.dish.price * (1 - item.appliedDiscount), 1, 0)} + ' ₽'"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Итоговая сумма -->
+    <div class="order-footer-card">
+        <div class="total-row">
+            <span>Итого к оплате:</span>
+            <div class="total-values">
+            <span th:if="${totalDiscounted != null and totalDiscounted < totalPrice}"
+                  class="total-original"
+                  th:text="${#numbers.formatDecimal(totalPrice, 1, 0)} + ' ₽'"></span>
+                <span class="total-final"
+                      th:text="${#numbers.formatDecimal(totalDiscounted, 1, 0)} + ' ₽'"></span>
+            </div>
+        </div>
+
+        <!-- Кнопка назад -->
+        <div class="actions-row">
+            <a th:href="@{/orders}" class="btn btn-back">
+                <i class="fas fa-arrow-left"></i> К списку заказов
+            </a>
+        </div>
+    </div>
+
 </div>
 
+<!-- Скрипты -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
 <script th:src="@{/js/common.js}"></script>
-<script th:src="@{/js/order-details.js}"></script>
+<!-- Если скрипт order-details.js пустой, его можно убрать или оставить на будущее -->
+<!-- <script th:src="@{/js/order-details.js}"></script> -->
 </body>
 </html>

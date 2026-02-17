@@ -1,81 +1,101 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
-  <!-- Favicon -->
-  <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+    <!-- Favicon -->
+    <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
 
-  <title>История заказов</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
-  <link rel="stylesheet" th:href="@{/css/common.css}">
-  <link rel="stylesheet" th:href="@{/css/orders.css}">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <title>История заказов</title>
+
+    <!-- Стили и иконки -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" th:href="@{/css/common.css}">
+    <link rel="stylesheet" th:href="@{/css/orders.css}">
 </head>
 <body>
+
+<!-- Шапка сайта -->
 <div th:replace="fragments/header :: header"></div>
 
 <div class="main-container">
-  <h1>Ваши заказы</h1>
+    <h1>Ваши заказы</h1>
 
-
-    <!-- Быстрые фильтры -->
+    <!-- 1. Фильтры в стиле вкладок -->
     <div class="quick-filters">
-        <!-- Кнопка "Все заказы" (сброс фильтра) -->
         <a th:href="@{/orders}"
            th:classappend="${statusFilter == null} ? 'active'"
-           class="filter-tab">
-            Все
-        </a>
+           class="filter-tab">Все</a>
 
-        <!-- Кнопка "Активные" -->
-        <!-- Теперь отправляем параметр ACTIVE -->
         <a th:href="@{/orders(statusFilter='ACTIVE')}"
            th:classappend="${statusFilter == 'ACTIVE'} ? 'active'"
-           class="filter-tab">
-            Активные
-        </a>
+           class="filter-tab">Активные</a>
 
-        <!-- Кнопка "Выполненные" (SERVED) -->
         <a th:href="@{/orders(statusFilter='SERVED')}"
            th:classappend="${statusFilter == 'SERVED'} ? 'active'"
-           class="filter-tab">
-            Поданные
-        </a>
+           class="filter-tab">Поданные</a>
 
-        <!-- Кнопка "Отмененные" (CANCELED) -->
         <a th:href="@{/orders(statusFilter='CANCELED')}"
            th:classappend="${statusFilter == 'CANCELED'} ? 'active'"
-           class="filter-tab">
-            Отмененные
+           class="filter-tab">Отмененные</a>
+    </div>
+
+    <!-- 2. Список заказов -->
+    <div th:unless="${orders.isEmpty()}" class="orders-grid">
+        <div th:each="order : ${orders}" class="order-card-item">
+
+            <div class="card-header">
+                <span class="order-number">№ <span th:text="${order.id}"></span></span>
+                <!-- Бейдж статуса -->
+                <span class="status-badge"
+                      th:classappend="'status-' + ${order.status.name().toLowerCase()}"
+                      th:text="${order.status.getDisplayName()}">
+        </span>
+            </div>
+
+            <div class="card-body">
+                <div class="info-row">
+                    <i class="far fa-calendar-alt"></i>
+                    <span th:text="${#temporals.format(order.timeSlot.day.workDate, 'dd.MM.yyyy')}"></span>
+                </div>
+                <div class="info-row">
+                    <i class="far fa-clock"></i>
+                    <span th:text="${#temporals.format(order.timeSlot.orderTime, 'HH:mm')}"></span>
+                </div>
+                <div class="info-row" th:if="${order.tableNumber != '0'}">
+                    <i class="fas fa-utensils"></i>
+                    <span>Столик №<span th:text="${order.tableNumber}"></span></span>
+                </div>
+                <div class="order-total-preview">
+                    <span>Сумма:</span>
+                    <strong th:text="${#numbers.formatDecimal(order.totalPrice, 1, 0)} + ' ₽'"></strong>
+                </div>
+            </div>
+
+            <div class="card-footer">
+                <a th:href="@{/orders/details/{id}(id=${order.id})}" class="btn btn-primary btn-full">
+                    Подробнее <i class="fas fa-chevron-right" style="font-size: 0.8rem; margin-left: 5px;"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Сообщение, если заказов нет -->
+    <div th:if="${orders.isEmpty()}" class="empty-state">
+        <div class="empty-icon"><i class="fas fa-receipt"></i></div>
+        <p>Заказов с таким статусом не найдено</p>
+        <a th:href="@{/menu}" class="btn btn-primary">Сделать заказ</a>
+    </div>
+
+    <!-- 4. Нижняя навигация -->
+    <div class="bottom-nav">
+        <a th:href="@{/menu}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Вернуться в меню
         </a>
     </div>
-
-
-
-    <!-- Список заказов -->
-  <div th:unless="${orders.isEmpty()}" class="orders-list">
-    <div th:each="order : ${orders}" class="order-card">
-      <div class="order-info">
-        <p><strong>Заказ №</strong> <span th:text="${order.id}"></span></p>
-        <p><strong>Статус:</strong> <span th:text="${order.status.getDisplayName()}" class="status"></span></p>
-        <p><strong>Дата заказа:</strong> <span th:text="${#temporals.format(order.timeSlot.day.workDate, 'dd.MM.yyyy')}"></span></p>
-        <p><strong>Время заказа:</strong> <span th:text="${#temporals.format(order.timeSlot.orderTime, 'HH:mm')}"></span></p>
-        <p><strong>Столик:</strong> <span th:text="${order.tableNumber}"></span></p>
-      </div>
-      <a th:href="@{/orders/details/{id}(id=${order.id})}" class="btn details-btn">Подробнее</a>
-    </div>
-  </div>
-
-  <!-- Сообщение, если заказов нет -->
-  <div th:if="${orders.isEmpty()}" class="no-orders">
-    <p>Не найдено заказы с таким статусом.</p>
-  </div>
-
-  <a th:href="@{/menu}" class="btn back-to-menu">Назад в меню</a>
 </div>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
 <script th:src="@{/js/common.js}"></script>
-<script th:src="@{/js/orders.js}"></script>
 </body>
 </html>

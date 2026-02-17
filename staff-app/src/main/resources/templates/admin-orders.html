@@ -1,157 +1,154 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.w3.org/1999/xhtml">
 <head>
-  <!-- Favicon -->
-  <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+    <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+    <meta charset="UTF-8">
+    <title>Панель персонала | Заказы</title>
 
-  <title>Управление заказами</title>
+    <!-- Библиотеки и общие стили -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" th:href="@{/css/common.css}">
 
-  <link rel="stylesheet" th:href="@{/css/common.css}">
-  <link rel="stylesheet" th:href="@{/css/admin-orders.css}">
-  <link rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
-        integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw=="
-        crossorigin="anonymous"
-        referrerpolicy="no-referrer" />
+    <!-- Специфичные стили для админки -->
+    <link rel="stylesheet" th:href="@{/css/admin-orders.css}">
 
+    <!-- CSRF-токены для безопасности POST-запросов -->
+    <meta th:name="_csrf" th:content="${_csrf.token}"/>
+    <meta th:name="_csrf_header" th:content="${_csrf.headerName}"/>
 </head>
 <body>
+
+<!-- Подключаем фрагмент шапки -->
 <div th:replace="fragments/header :: header"></div>
-  <div class="container">
-    <h1>Управление заказами</h1>
 
-    <div class="quick-filters">
-      <button th:classappend="${selectedStatus == ''} ? 'active'"
-              onclick="location.href='/admin/orders?status='">
-        Все заказы
-      </button>
-      <button th:classappend="${selectedStatus == 'COOKING'} ? 'active'"
-              onclick="location.href='/admin/orders?status=COOKING'">
-        Активные заказы
-      </button>
-        <button th:classappend="${selectedStatus == 'READY'} ? 'active'"
-                onclick="location.href='/admin/orders?status=READY'">
-            Готовые к выдаче
-        </button>
-      <button th:classappend="${selectedStatus == 'SERVED'} ? 'active'"
-              onclick="location.href='/admin/orders?status=SERVED'">
-        Выполненные
-      </button>
-      <button th:classappend="${selectedStatus == 'CANCELED'} ? 'active'"
-              onclick="location.href='/admin/orders?status=CANCELED'">
-        Отмененные заказы
-      </button>
+<div class="main-container">
+
+    <div class="admin-page-header">
+        <h1>Управление заказами</h1>
     </div>
 
-    <div class="table-filter">
-      <input
-              type="text"
-              id="tableNumberFilter"
-              placeholder="Фильтр по номеру столика"
-              oninput="filterOrdersByTable()"
-      >
-    </div>
+    <!-- ТУЛБАР: Фильтры + Поиск в одну строку -->
+    <div class="admin-filter-toolbar">
+        <div class="admin-quick-filters">
+            <a th:href="@{/admin/orders(status='')}"
+               th:classappend="${selectedStatus == null or selectedStatus == ''} ? 'active'"
+               class="admin-filter-tab">Все заказы</a>
 
-    <div class="order-container">
-      <div th:each="order : ${orders}" class="order-card" th:attr="data-order-id=${order.id}">
-          <div class="order-header" onclick="handleOrderClick(event)">
-              <h3>Заказ #<span th:text="${order.id}"></span></h3>
+            <a th:href="@{/admin/orders(status='COOKING')}"
+               th:classappend="${selectedStatus == 'COOKING'} ? 'active'"
+               class="admin-filter-tab">В работе</a>
 
-              <span class="status-badge"
-                    th:classappend="${order.status.name() == 'READY'} ? 'status-ready' : ''">
+            <a th:href="@{/admin/orders(status='READY')}"
+               th:classappend="${selectedStatus == 'READY'} ? 'active'"
+               class="admin-filter-tab">Готовы к выдаче</a>
 
-                <!-- Иконка песочных часов для COOKING -->
-                <i class="fas fa-hourglass-half" th:if="${order.status.name() == 'COOKING'}"></i>
+            <a th:href="@{/admin/orders(status='SERVED')}"
+               th:classappend="${selectedStatus == 'SERVED'} ? 'active'"
+               class="admin-filter-tab">Завершены</a>
 
-                  <!-- НОВАЯ ИКОНКА: Колокольчик для READY -->
-                <i class="fas fa-bell" th:if="${order.status.name() == 'READY'}"></i>
-
-                  <!-- Галочка для SERVED -->
-                <i class="fas fa-check-circle" th:if="${order.status.name() == 'SERVED'}"></i>
-
-                  <!-- Крестик для CANCELED -->
-                <i class="fas fa-times-circle" th:if="${order.status.name() == 'CANCELED'}"></i>
-
-                  <!-- Текст статуса -->
-                <span th:text="${order.status.displayName}"></span>
-              </span>
-          </div>
-
-        <div class="order-details">
-          <div class="detail-item">
-            <span class="detail-label">Столик</span>
-            <span
-                    class="detail-value"
-                    th:text="${order.tableNumber} ?: 'Не указан'"
-                    th:attr="data-table=${order.tableNumber} ?: ''"
-            ></span>
-          </div>
-
-            <div class="detail-item">
-                <span class="detail-label">Клиент</span>
-                <span class="detail-value"
-                      th:text="${order.client != null} ? ${order.client.fullName} : 'Гость'">
-                </span>
-            </div>
-
-
-            <div class="detail-item">
-            <span class="detail-label">Дата</span>
-            <span class="detail-value"
-                  th:text="${#temporals.format(order.timeSlot.day.workDate, 'dd.MM.yyyy')}"></span>
-          </div>
-          <div class="detail-item">
-            <span class="detail-label">Время</span>
-            <span class="detail-value"
-                  th:text="${#temporals.format(order.timeSlot.orderTime, 'HH:mm')}"></span>
-          </div>
-          <div class="detail-item">
-            <span class="detail-label">Сумма</span>
-            <span class="detail-value"
-                  th:text="${#numbers.formatDecimal(order.totalPrice, 0, 'COMMA', 2, 'POINT') + ' ₽'}"></span>
-          </div>
+            <a th:href="@{/admin/orders(status='CANCELED')}"
+               th:classappend="${selectedStatus == 'CANCELED'} ? 'active'"
+               class="admin-filter-tab">Отменены</a>
         </div>
 
-          <div class="action-buttons">
-
-              <!-- СЦЕНАРИЙ 1: Заказ Готовится (COOKING) -->
-              <!-- Видят: ПОВАР и АДМИН. Действие: Перевести в READY -->
-              <form th:if="${order.status.name() == 'COOKING'}"
-                    th:action="@{/admin/orders/{id}/status(id=${order.id})}"
-                    method="post"
-                    sec:authorize="hasAnyRole('COOK', 'ADMIN')">
-                  <input type="hidden" name="newStatus" value="READY">
-                  <button type="submit" class="btn btn-ready">
-                      <i class="fas fa-bell"></i> Готово
-                  </button>
-              </form>
-
-              <!-- СЦЕНАРИЙ 2: Заказ Готов (READY) -->
-              <!-- Видят: ОФИЦИАНТ и АДМИН. Действие: Перевести в SERVED -->
-              <form th:if="${order.status.name() == 'READY'}"
-                    th:action="@{/admin/orders/{id}/status(id=${order.id})}"
-                    method="post"
-                    sec:authorize="hasAnyRole('WAITER', 'ADMIN')">
-                  <input type="hidden" name="newStatus" value="SERVED">
-                  <button type="submit" class="btn btn-serve">
-                      <i class="fas fa-check"></i> Подать
-                  </button>
-              </form>
-
-              <!-- Кнопка ОТМЕНЫ (видна АДМИНУ, если заказ не завершен) -->
-              <form th:if="${order.status.name() != 'SERVED' and order.status.name() != 'CANCELED'}"
-                    th:action="@{/admin/orders/{id}/status(id=${order.id})}"
-                    method="post"
-                    sec:authorize="hasRole('ADMIN')">
-                  <input type="hidden" name="newStatus" value="CANCELED">
-                  <button type="submit" class="btn btn-cancel">✕ Отменить</button>
-              </form>
-          </div>
-      </div>
+        <!-- Поиск по столику -->
+        <div class="search-box">
+            <i class="fas fa-search"></i>
+            <input type="text" id="tableNumberFilter" placeholder="Столик..." oninput="filterOrdersByTable()">
+        </div>
     </div>
-  </div>
 
+    <!-- СЕТКА КАРТОЧЕК ЗАКАЗОВ -->
+    <div class="order-grid">
+
+        <!-- Если список пуст -->
+        <div th:if="${orders.isEmpty()}" class="empty-data-state">
+            <i class="fas fa-clipboard-list"></i>
+            <p>Заказов в данной категории пока нет</p>
+        </div>
+
+        <!-- Карточка конкретного заказа -->
+        <div th:each="order : ${orders}" class="admin-order-card" th:attr="data-order-id=${order.id}">
+
+            <!-- Шапка карточки: Номер и Статус -->
+            <div class="card-header" onclick="handleOrderClick(event)">
+                <div class="order-id-block">
+                    <span class="id-label">ЗАКАЗ</span>
+                    <span class="id-value">#<span th:text="${order.id}"></span></span>
+                </div>
+                <span class="status-badge"
+                      th:classappend="'status-' + ${order.status.name().toLowerCase()}"
+                      th:text="${order.status.displayName}">
+              </span>
+            </div>
+
+            <!-- Тело карточки: Детали -->
+            <div class="card-body" onclick="handleOrderClick(event)">
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="label">Столик</span>
+                        <!-- data-table нужен для работы JS-фильтра -->
+                        <span class="value" th:text="${order.tableNumber} ?: '—'" th:attr="data-table=${order.tableNumber} ?: ''"></span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Время</span>
+                        <span class="value" th:text="${#temporals.format(order.timeSlot.orderTime, 'HH:mm')}"></span>
+                    </div>
+                    <div class="info-item full-width">
+                        <span class="label">Клиент</span>
+                        <span class="value" th:text="${order.client != null} ? ${order.client.fullName} : 'Гость 👤'"></span>
+                    </div>
+                </div>
+
+                <!-- Итоговая сумма (шрифт задается в CSS как Lato) -->
+                <div class="order-amount">
+                    <span th:text="${#numbers.formatDecimal(order.totalPrice, 1, 0)} + ' ₽'"></span>
+                </div>
+            </div>
+
+            <!-- Действия с заказом (зависят от роли сотрудника) -->
+            <div class="card-actions">
+
+                <!-- СЦЕНАРИЙ: Повар переводит из Готовки в Готовность -->
+                <form th:if="${order.status.name() == 'COOKING'}"
+                      th:action="@{/admin/orders/{id}/status(id=${order.id})}"
+                      method="post" sec:authorize="hasAnyRole('COOK', 'ADMIN')">
+                    <input type="hidden" name="newStatus" value="READY">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-check"></i> Готово
+                    </button>
+                </form>
+
+                <!-- СЦЕНАРИЙ: Официант переводит из Готов в Подан -->
+                <form th:if="${order.status.name() == 'READY'}"
+                      th:action="@{/admin/orders/{id}/status(id=${order.id})}"
+                      method="post" sec:authorize="hasAnyRole('WAITER', 'ADMIN')">
+                    <input type="hidden" name="newStatus" value="SERVED">
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-hand-holding-heart"></i> Подать
+                    </button>
+                </form>
+
+                <!-- СЦЕНАРИЙ: Администратор может отменить любой незавершенный заказ -->
+                <form th:if="${order.status.name() != 'SERVED' and order.status.name() != 'CANCELED'}"
+                      th:action="@{/admin/orders/{id}/status(id=${order.id})}"
+                      method="post" sec:authorize="hasRole('ADMIN')">
+                    <input type="hidden" name="newStatus" value="CANCELED">
+                    <button type="submit" class="btn btn-danger"
+                            onclick="return confirm('Вы уверены, что хотите отменить этот заказ?')">
+                        <i class="fas fa-times"></i> <span>Отменить</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Подключение скриптов -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script th:src="@{/js/common.js}"></script>
 <script th:src="@{/js/admin-orders.js}"></script>
+
 </body>
 </html>

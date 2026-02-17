@@ -1,318 +1,315 @@
 /* dish-reviews.css */
-.dish-info {
-  text-align: center;
-  background-color: var(--color0);
-  padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  margin-bottom: 2rem;
-  max-width: 800px;
-  margin: 2rem auto;
+
+/* === 1. Общие настройки и навигация === */
+.main-container {
+    max-width: 1100px;
+    padding-bottom: 5rem;
 }
 
-.dish-image {
-  width: 500px;
-  height: auto;
-  object-fit: cover;
-  border-radius: 12px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+.top-navigation {
+    margin-bottom: 1.5rem;
 }
 
-.rating-summary {
-  margin: 1rem 0;
-  font-size: 1.2rem;
-  color: var(--color4);
+/* === 2. Главная карточка презентации блюда === */
+.dish-presentation-card {
+    display: flex;
+    background-color: var(--color0);
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    margin-bottom: 3rem;
+    border-left: 6px solid var(--color3);
+
+    /* ФИКС ДЛЯ УГЛОВ: */
+    -webkit-backface-visibility: hidden; /* Скрывает "заднюю сторону" элемента при рендеринге */
+    -webkit-transform: translate3d(0, 0, 0); /* Принудительно включает аппаратное ускорение для самого контейнера */
+    transform: translateZ(0); /* Создает новый контекст наложения */
 }
 
-/* Форма отзыва */
-.review-form {
-  background-color: var(--color0);
-  padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  margin: 2rem auto;
-  max-width: 800px;
+.dish-visual {
+    flex: 0 0 45%;
+    position: relative;
+    min-height: 400px;
 }
 
-.review-form h2 {
-  color: var(--color4);
-  margin-bottom: 1.5rem;
-  text-align: center;
+.main-dish-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
-.rating-input {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
+.dish-weight {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    background-color: rgba(104, 50, 4, 0.85); /* color4 */
+    color: white;
+    padding: 6px 15px;
+    border-radius: 25px;
+    font-size: 0.9rem;
+    backdrop-filter: blur(5px);
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
-.stars {
-  display: flex;
-  gap: 0.5rem;
+.dish-details {
+    flex: 1;
+    padding: 3rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 
-.stars i {
-  font-size: 2rem;
-  cursor: pointer;
-  color: var(--color2);
-  transition: all 0.2s;
+.dish-details h1 {
+    font-size: 2.5rem;
+    margin-bottom: 1.5rem;
+    color: var(--color5);
+    line-height: 1.1;
 }
 
-.stars i:hover,
-.stars i.active {
-  color: var(--color3);
-  transform: scale(1.1);
+.dish-stats-row {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 1.5rem;
 }
 
-textarea {
-  width: 95%;
-  padding: 1rem;
-  border: 2px solid var(--color1);
-  border-radius: 8px;
-  resize: vertical;
-  min-height: 120px;
-  margin-bottom: 1.5rem;
-  transition: border-color 0.3s;
+.stars-display {
+    color: #ffd700; /* Золотой цвет для звезд */
+    font-size: 1.2rem;
 }
 
-textarea:focus {
-  border-color: var(--color3);
-  outline: none;
+.rating-text {
+    font-weight: 700;
+    color: var(--color5);
 }
 
-.review-form button {
-  width: 100%;
-  padding: 1rem;
-  font-size: 1.1rem;
+.reviews-count {
+    color: var(--color3);
+    font-size: 0.9rem;
 }
 
-.review-form button:hover {
-  background: var(--color3);
+.dish-desc {
+    font-size: 1.05rem;
+    line-height: 1.6;
+    color: var(--color5);
+    margin-bottom: 2rem;
 }
 
-/* Список отзывов */
-.reviews-list {
-  max-width: 800px;
-  margin: 2rem auto;
+/* Состав в виде тегов */
+.dish-ingredients h4 {
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+    color: var(--color4);
 }
 
-.review-item {
-  background-color: var(--color0);
-  padding: 1.5rem;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  margin-bottom: 1.5rem;
-  transition: transform 0.3s, box-shadow 0.3s;
+.tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 
-.review-item:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+.tag {
+    background-color: var(--color1);
+    color: var(--color5);
+    padding: 4px 12px;
+    border-radius: 15px;
+    font-size: 0.85rem;
+    border: 1px solid var(--color2);
+    transition: all 0.2s;
 }
 
-.review-rating {
-  margin-bottom: 1rem;
+.tag:hover {
+    background-color: var(--color2);
+    transform: scale(1.05);
 }
 
-.review-rating i {
-  color: var(--color3);
+/* === 3. Секция написания отзыва === */
+.review-write-section {
+    background-color: var(--color0);
+    padding: 2.5rem;
+    border-radius: 20px;
+    border: 1px solid var(--color2);
+    margin-bottom: 4rem;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.03);
 }
 
-.review-author {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: var(--color4);
-  font-size: 0.9rem;
+.card-header-simple {
+    text-align: center;
+    margin-bottom: 2rem;
 }
 
-.review-author::before {
-  content: "—";
-  margin-right: 0.5rem;
+.card-header-simple h2 {
+    margin-bottom: 5px;
 }
 
-/* Анимация появления отзывов */
-.review-item {
-  opacity: 0;
-  animation: fadeIn 0.5s ease-out forwards;
+.card-header-simple p {
+    color: var(--color3);
 }
 
-.review-item .stars i {
-  pointer-events: none; /* Блокирует любые взаимодействия */
-  cursor: default !important; /* Курсор по умолчанию */
+.rating-selector {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 1.5rem;
 }
 
-.review-item .stars i:hover {
-  transform: none !important;
-  color: inherit !important;
+.stars-input {
+    font-size: 2rem;
+    color: var(--color2);
+    display: flex;
+    gap: 5px;
 }
 
-@keyframes fadeIn {
-  to {
-    opacity: 1;
-  }
+.stars-input i {
+    cursor: pointer;
+    transition: transform 0.2s, color 0.2s;
 }
 
-/* Задержка для каждого отзыва */
-.review-item:nth-child(1) { animation-delay: 0.1s; }
-.review-item:nth-child(2) { animation-delay: 0.3s; }
-.review-item:nth-child(3) { animation-delay: 0.5s; }
-
-.composition {
-  background: var(--color1); /* #e1c9ad */
-  border-radius: 12px;
-  padding: 1.5rem;
-  margin: 2rem auto;
-  max-width: 600px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  position: relative;
-  overflow: hidden;
-  perspective: 1000px;
+.stars-input i:hover {
+    transform: scale(1.2);
 }
 
-.composition::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 4px;
-  height: 100%;
-  background: var(--color3); /* #9f5727 */
+.stars-input i.active,
+.stars-input i.hover {
+    color: #ffd700;
 }
 
-.composition h3 {
-  color: var(--color5); /* #482813 */
-  font-size: 1.5rem;
-  margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 2px solid var(--color3);
-  display: inline-block;
-  margin-top: 0;
+.textarea-wrapper {
+    margin-bottom: 1.5rem;
 }
 
-.composition h3::after {
-  content: "";
-  display: block;
-  width: 60px;
-  height: 3px;
-  background: var(--color3);
-  margin-top: 0.5rem;
-  animation: underlineGrow 0.5s ease-out;
+.textarea-wrapper textarea {
+    min-height: 120px;
+    resize: vertical;
 }
 
-@keyframes underlineGrow {
-  from { width: 0; }
-  to { width: 60px; }
+.form-actions {
+    text-align: center;
 }
 
-.composition ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 0.8rem;
+.guest-login-promo {
+    text-align: center;
+    padding: 2rem;
+    background: rgba(159, 87, 39, 0.05);
+    border-radius: 15px;
+    margin-bottom: 3rem;
 }
 
-.composition li {
-  position: relative;
-  padding: 0.8rem 1rem 0.8rem 2rem;
-  background: var(--color0);
-  border-radius: 8px;
-  font-size: 0.95rem;
-  color: var(--color5);
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+/* === 4. Лента отзывов === */
+.reviews-feed {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
 }
 
-/*.composition li::before {
-  content: "•";
-  position: absolute;
-  left: 1rem;
-  color: var(--color3);
-  font-size: 1.2rem;
-  line-height: 1;
-}*/
-
-.composition li:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  background: var(--color0);
+.feed-title {
+    font-size: 1.8rem;
+    border-bottom: 2px solid var(--color2);
+    padding-bottom: 10px;
+    margin-bottom: 1rem;
 }
 
-.composition li::before {
-  content: "";
-  width: 16px;
-  height: 16px;
-  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%239F5727"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>');
-  left: 0.5rem;
-  top: 50%;
-  transform: translateY(-50%);
+.review-bubble {
+    background-color: var(--color0);
+    padding: 1.5rem;
+    border-radius: 15px;
+    border: 1px solid var(--color1);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+    transition: transform 0.3s ease;
 }
 
-/* Для мобильной адаптации */
-@media (max-width: 480px) {
-  .composition ul {
-    grid-template-columns: 1fr;
-  }
-
-  .composition li {
-    padding: 0.6rem 1rem 0.6rem 1.8rem;
-  }
+.review-bubble:hover {
+    transform: translateX(10px);
+    border-color: var(--color2);
 }
 
-
-.weight-info {
-  margin: 1.5rem 0;
-  padding: 1.2rem;
-  background: rgba(232, 217, 202, 0.2); /* Полупрозрачный фон цвета #e1c9ad */
-  border: 2px solid var(--color1);
-  border-radius: 10px;
-  position: relative;
-  overflow: hidden;
+.bubble-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
 }
 
-/* Центрирующий контейнер */
-.weight-container {
-  display: flex;
-  justify-content: center;
-  margin: 2rem 0;
+.user-meta {
+    display: flex;
+    align-items: center;
+    gap: 15px;
 }
 
-.weight-info {
-  width: fit-content; /* Ширина по содержимому */
-  padding: 1.5rem 3rem;
-  text-align: center; /* Выравнивание текста по центру */
-
-  /* Существующие стили */
-  background: rgba(232, 217, 202, 0.2);
-  border: 2px solid var(--color1);
-  border-radius: 10px;
-  position: relative;
+.avatar-small {
+    width: 45px;
+    height: 45px;
+    background-color: var(--color2);
+    color: var(--color5);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1.2rem;
+    text-transform: uppercase;
 }
 
-/* Декоративные элементы */
-.weight-info::before {
-  content: "⚖️";
-  position: absolute;
-  left: -20px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 2rem;
-  opacity: 0.3;
+.user-info strong {
+    display: block;
+    font-size: 1.1rem;
+    color: var(--color5);
 }
 
-.weight-info::after {
-  content: "";
-  position: absolute;
-  right: -20px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 40px;
-  height: 40px;
-  background: var(--color3);
-  opacity: 0.1;
-  border-radius: 50%;
+.review-date {
+    font-size: 0.8rem;
+    color: var(--color3);
+}
+
+.stars-mini {
+    color: #ffd700;
+    font-size: 0.85rem;
+}
+
+.bubble-content p {
+    margin: 0;
+    line-height: 1.6;
+    color: var(--color5);
+}
+
+.no-reviews-state {
+    text-align: center;
+    padding: 3rem;
+    color: var(--color2);
+}
+
+.no-reviews-state i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+/* === Адаптивность === */
+@media (max-width: 992px) {
+    .dish-presentation-card {
+        flex-direction: column;
+    }
+
+    .dish-visual {
+        min-height: 300px;
+    }
+}
+
+@media (max-width: 576px) {
+    .dish-details {
+        padding: 1.5rem;
+    }
+
+    .dish-details h1 {
+        font-size: 1.8rem;
+    }
+
+    .rating-selector {
+        flex-direction: column;
+        gap: 10px;
+    }
 }

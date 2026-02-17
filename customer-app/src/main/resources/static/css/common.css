@@ -1,274 +1,167 @@
 /* common.css */
 
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Roboto:wght@300;400;500&display=swap');
+/* 1. Импорт шрифтов: Только Lato (текст) и Playfair Display (заголовки) */
+@import url('https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&family=Playfair+Display:wght@500;700&display=swap');
 
+/* 2. Глобальные переменные */
 :root {
-  --color0: #f7f5f3;
-  --color1: #eee2d6;
-  --color2: #d4ae8a;
-  --color3: #9f5727;
-  --color4: #683204;
-  --color5: #482813;
+  --color0: #f7f5f3; /* Белый/светло-серый (фон карточек) */
+  --color1: #eee2d6; /* Основной фон страницы */
+  --color2: #d4ae8a; /* Бежевый (границы, неактивные элементы) */
+  --color3: #9f5727; /* Рыжий (акцент, основные кнопки) */
+  --color4: #683204; /* Темно-коричневый (заголовки, ховер) */
+  --color5: #482813; /* Почти черный (основной текст) */
+
   --success: #28a745;
   --error: #dc3545;
+
+  --header-height: 60px; /* Единая высота шапки для расчета отступов */
+  --border-radius: 8px;  /* Единое закругление углов */
+}
+
+/* 3. Сброс и Базовые настройки */
+*, *::before, *::after {
+  box-sizing: border-box; /* Важно! Padding не будет увеличивать ширину элементов */
 }
 
 body {
-  font-family: 'Lato', sans-serif; /* Основной текст */
+  font-family: 'Lato', sans-serif;
   font-weight: 400;
   line-height: 1.6;
-  background-color: var(--color1); /* Светлый фон для основного контента */
+  background-color: var(--color1);
   color: var(--color5);
-  padding-top: 100px; /* Увеличим отступ для шапки */
-  padding-left: 30px;
-  padding-right: 30px;
   margin: 0;
-  line-height: 1.6;
-  left: 0;
-  right: 0;
+  /* Автоматический отступ сверху = высота шапки + воздух */
+  padding-top: calc(var(--header-height) + 30px);
 }
 
 h1, h2, h3, h4, h5, h6 {
   font-family: 'Playfair Display', serif;
-  font-weight: 600;
-  margin: 1.5rem 0;
+  font-weight: 700;
+  color: var(--color5);
+  margin-top: 0;
+  margin-bottom: 1.5rem;
 }
 
-/* Фиксированная шапка */
-header {
-  font-family: 'Playfair Display', serif;
-  font-weight: 500;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  width: 100%;
-  z-index: 1000;
-  background: var(--color5);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  padding: 0 30px;
-}
-
-.header-content {
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-/* Общие стили для всех типов пользователей */
-.header-role-content {
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  height: 80px;
-}
-
-.left-section {
-  display: flex;
-  align-items: center;
-  /*gap: 40px;*/
-}
-
-.right-section {
-  display: flex;
-  align-items: center;
-  /*gap: 30px;*/
-}
-
-/* Специфичные стили для обычных пользователей */
-.header-role-content .logo {
-  /*margin-right: 40px;*/
-}
-
-.main-nav {
-  display: flex;
-  gap: 25px;
-}
-
-/* Стили для админ-шапки (сотрудников) */
-.header-role-content[th|if] .left-section {
-  padding-left: 30px;
-  gap: 25px;
-}
-
-/* Общие стили ссылок и кнопок */
-header a,
-.nav-link {
-  color: var(--color0);
+a {
+  color: var(--color3);
   text-decoration: none;
-  font-weight: 500;
-  padding: 8px 12px;
-  border-radius: 6px;
-  transition: all 0.3s ease;
-  display: inline-flex;
-  align-items: center;
+  transition: color 0.3s ease;
 }
 
-header a:hover,
-.nav-link:hover {
-  background: rgba(225, 201, 173, 0.1);
-  transform: translateY(-2px);
+a:hover {
+  color: var(--color4);
 }
 
-/* Специфичные стили для кнопок */
-.login-btn,
-.nav-link{
-  background: var(--color3);
-  color: var(--color0) !important;
-  padding: 8px 20px !important;
-}
-
-.login-btn:hover,
-.nav-link:hover {
-  background: var(--color4) !important;
-}
-
-/* Сброс стилей для кнопок */
-button.nav-link.login-btn {
-  border: none;
-  outline: none;
-  box-shadow: none;
-}
-
-/* Стили для кнопки "Выйти" */
-header .logout-form .nav-link.login-btn {
-  padding: 8px 20px !important;
-  font-family: 'Playfair Display', serif;
-  font-weight: 500;
-  font-size: 16px; /* Подберите точный размер */
-  min-height: 40px; /* Подберите высоту */
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.logout-form {
-  display: inline-block;
-  margin: 0;
-}
-
-/* Логотип */
-.logo-img {
-  height: 80px;
-  width: auto;
-  transition: transform 0.3s ease;
-}
-
-.logo-img:hover {
-  transform: scale(1.25);
-}
-
-header .logo:hover {
-  background: none;
-}
-
-/* Адаптивность */
-@media (max-width: 768px) {
-  header {
-    padding: 0 15px;
-  }
-
-  .header-role-content {
-    height: 60px;
-    gap: 15px;
-  }
-
-  .left-section {
-    gap: 15px;
-  }
-
-  .right-section {
-    gap: 15px;
-  }
-
-  .main-nav {
-    gap: 10px;
-  }
-
-  header a,
-  .nav-link {
-    font-size: 0.9rem;
-    padding: 6px 10px;
-  }
-
-  .logo-img {
-    height: 35px;
-  }
-
-  .header-role-content[th|if] .left-section {
-    padding-left: 15px;
-    gap: 15px;
-  }
-}
-
-@media (max-width: 480px) {
-  .header-role-content {
-    flex-wrap: wrap;
-    height: auto;
-    padding: 10px 0;
-  }
-
-  .left-section,
-  .right-section {
-    flex-wrap: wrap;
-    gap: 10px;
-  }
-
-  .main-nav {
-    order: 1;
-    width: 100%;
-    justify-content: center;
-  }
-}
-
-/* Общий контейнер для центрирования контента */
+/* 4. Контейнеры */
 .main-container {
   max-width: 1400px;
   margin: 0 auto;
   padding: 0 30px;
-}
-
-/* Общие стили для кнопок */
-button, .btn {
-  background: var(--color4);
-  color: var(--color0);
-  border: none;
-  padding: 0.8rem 1.5rem;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  text-decoration: none;
-}
-
-button:hover, .btn:hover {
-  background: var(--color3);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  transform: translateY(-2px);
-}
-
-/* Базовые стили для форм */
-input, textarea, select {
-  border: 2px solid var(--color3);
-  border-radius: 8px;
   width: 100%;
-  transition: border-color 0.3s ease;
-  background: var(--color0);
 }
 
-input:focus,
-textarea:focus,
-select:focus {
-  outline: none;
-  border-color: var(--color3);
-}
-
-/* Утилиты */
 .container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 0 20px;
 }
 
-/* Анимации */
+/* 5. Универсальные кнопки (UI Kit) */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.8rem 1.5rem;
+  border-radius: var(--border-radius);
+  border: 2px solid transparent;
+  font-family: 'Lato', sans-serif;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  line-height: 1.2;
+  gap: 8px; /* Отступ между иконкой и текстом */
+}
+
+/* Основная кнопка (Рыжая) */
+.btn-primary {
+  background-color: var(--color3);
+  color: var(--color0);
+}
+
+.btn-primary:hover {
+  background-color: var(--color4);
+  color: var(--color0);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(104, 50, 4, 0.2);
+}
+
+/* Вторичная кнопка (Прозрачная с рамкой) */
+.btn-secondary {
+  background-color: transparent;
+  border-color: var(--color2);
+  color: var(--color5);
+}
+
+.btn-secondary:hover {
+  background-color: var(--color2);
+  color: var(--color5);
+}
+
+/* Кнопка опасного действия (Красная) */
+.btn-danger {
+  background-color: rgba(220, 53, 69, 0.1);
+  color: var(--error);
+  border-color: var(--error);
+}
+
+.btn-danger:hover {
+  background-color: var(--error);
+  color: white;
+}
+
+/* Кнопка успеха (Зеленая) */
+.btn-success {
+  background-color: var(--success);
+  color: white;
+}
+
+.btn-success:hover {
+  background-color: #218838;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.2);
+}
+
+/* 6. Поля ввода (Inputs) */
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="number"],
+input[type="date"],
+input[type="time"],
+select,
+textarea {
+  width: 100%;
+  padding: 12px 15px;
+  border: 2px solid var(--color2);
+  border-radius: var(--border-radius);
+  background-color: var(--color0);
+  color: var(--color5);
+  font-family: inherit;
+  font-size: 1rem;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  outline: none;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--color3);
+  box-shadow: 0 0 0 4px rgba(159, 87, 39, 0.15); /* Мягкое рыжее свечение */
+}
+
+/* 7. Анимации */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
@@ -278,9 +171,50 @@ select:focus {
   animation: fadeIn 0.5s ease-out;
 }
 
-/* Для маленьких экранов уменьшим отступы */
+/* === Стилизация скроллбара === */
+
+/* 1. Для Chrome, Safari и Edge (Webkit) */
+
+/* Ширина всего скроллбара */
+::-webkit-scrollbar {
+    width: 12px;
+}
+
+/* Фон дорожки (трека) скроллбара */
+::-webkit-scrollbar-track {
+    background: var(--color1); /* Используем наш светлый бежевый фон */
+}
+
+/* Ползунок (часть, которую мы тащим) */
+::-webkit-scrollbar-thumb {
+    background-color: var(--color3); /* Наш рыжий акцент */
+    border-radius: 10px; /* Делаем его закругленным */
+    /* Добавляем границу цвета фона, чтобы создать эффект "отступа" ползунка от краев */
+    border: 3px solid var(--color1);
+}
+
+/* Ползунок при наведении (делаем чуть темнее) */
+::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color4); /* Наш темно-коричневый */
+}
+
+/* 2. Для Firefox */
+html {
+    /* scrollbar-color: [цвет ползунка] [цвет дорожки] */
+    scrollbar-color: var(--color3) var(--color1);
+    scrollbar-width: thin; /* Делаем его потоньше */
+}
+
+/* 8. Адаптивность (Базовая) */
 @media (max-width: 768px) {
+  :root {
+    --header-height: 60px; /* Уменьшаем высоту шапки на мобильных */
+  }
+
   .main-container {
     padding: 0 15px;
   }
+
+  h1 { font-size: 2rem; }
+  h2 { font-size: 1.75rem; }
 }

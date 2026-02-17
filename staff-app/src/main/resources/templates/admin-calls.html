@@ -11,7 +11,7 @@
     <link rel="stylesheet" th:href="@{/css/common.css}">
     <link rel="stylesheet" th:href="@{/css/admin-calls.css}">
 
-    <!-- CSRF токены для AJAX запросов -->
+    <!-- CSRF токены -->
     <meta th:name="_csrf" th:content="${_csrf.token}"/>
     <meta th:name="_csrf_header" th:content="${_csrf.headerName}"/>
 </head>
@@ -23,45 +23,56 @@
 
     <div class="page-header">
         <h1>Активные вызовы</h1>
-        <!-- Кнопка ручного обновления (на всякий случай) -->
+
+        <!-- Кнопка обновления -->
         <button onclick="location.reload()" class="btn-refresh" title="Обновить список">
-            <i class="fas fa-sync-alt"></i>
+            <i class="fas fa-sync-alt"></i> Обновить
         </button>
     </div>
 
-    <!-- Контейнер для карточек -->
+    <!-- Сетка вызовов -->
     <div class="calls-grid">
 
         <!-- Сообщение, если вызовов нет -->
-        <div th:if="${calls.isEmpty()}" class="no-calls">
-            <i class="fas fa-check-circle"></i>
-            <p>Нет активных вызовов. Отличная работа!</p>
+        <div th:if="${calls.isEmpty()}" class="no-calls-state">
+            <div class="icon-box">
+                <i class="fas fa-mug-hot"></i>
+            </div>
+            <h3>Тишина и спокойствие</h3>
+            <p>Активных вызовов пока нет</p>
         </div>
 
         <!-- Карточка вызова -->
         <div th:each="call : ${calls}" class="call-card" th:id="'call-' + ${call.id}">
+
+            <!-- Шапка с номером стола -->
             <div class="call-header">
-                <span class="table-number" th:text="${call.tableNumber}">12</span>
                 <span class="table-label">Столик</span>
+                <span class="table-number" th:text="${call.tableNumber}">12</span>
             </div>
 
+            <!-- Тело с информацией -->
             <div class="call-body">
-                <div class="client-info">
-                    <i class="fas fa-user"></i>
-                    <span th:if="${call.client != null}" th:text="${call.client.fullName}">Имя Клиента</span>
+                <div class="info-row client-row">
+                    <i class="fas fa-user-circle"></i>
+                    <span th:if="${call.client != null}" th:text="${call.client.fullName}">Имя</span>
                     <span th:if="${call.client == null}">Гость</span>
                 </div>
-                <div class="time-info">
+
+                <div class="info-row time-row">
                     <i class="far fa-clock"></i>
-                    <!-- Форматируем время вызова -->
-                    <span th:text="${#temporals.format(call.callTime, 'HH:mm')}">12:30</span>
-                    <span class="time-ago" th:data-time="${call.callTime}">(только что)</span>
+                    <div class="time-data">
+                        <span class="exact-time" th:text="${#temporals.format(call.callTime, 'HH:mm')}">12:30</span>
+                        <!-- data-time нужен для JS скрипта, который считает минуты -->
+                        <span class="time-ago" th:data-time="${call.callTime}">...</span>
+                    </div>
                 </div>
             </div>
 
+            <!-- Кнопка действия -->
             <div class="call-footer">
-                <button class="btn-accept" th:onclick="'acceptCall(' + ${call.id} + ')'">
-                    Принять
+                <button class="btn btn-accept" th:onclick="'acceptCall(' + ${call.id} + ')'">
+                    <i class="fas fa-check"></i> Завершить вызов
                 </button>
             </div>
         </div>
@@ -72,7 +83,6 @@
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
 <script th:src="@{/js/common.js}"></script>
-<!-- Скрипт конкретно для этой страницы -->
 <script th:src="@{/js/admin-calls.js}"></script>
 
 </body>

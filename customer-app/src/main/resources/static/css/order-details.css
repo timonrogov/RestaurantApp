@@ -1,82 +1,314 @@
+/* order-details.css */
+
+/* === 1. Основной контейнер === */
 .main-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 2rem;
-    background-color: var(--color1);
+    max-width: 1000px;
+    padding-bottom: 4rem;
 }
 
-h1 {
-    font-size: 2.5rem;
+/* === 2. Шапка заказа (Карточка) === */
+.order-header-card {
+    background-color: var(--color0);
+    border-radius: 12px;
+    /* Уменьшили отступы для компактности */
+    padding: 1.5rem 2rem;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    margin-bottom: 2rem;
+    border-left: 5px solid var(--color3);
+    display: flex;
+    flex-direction: column;
+    /* Уменьшили расстояние между строками */
+    gap: 0.5rem;
+}
+
+.header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    /* Убрали линию разделителя, чтобы сделать компактнее, или сделали её тоньше */
+    border-bottom: 1px solid var(--color1);
+    padding-bottom: 0.8rem;
+    margin-bottom: 0.5rem;
+}
+
+.header-top h1 {
+    margin: 0;
+    font-size: 1.8rem; /* Чуть меньше шрифт заголовка */
     color: var(--color5);
-    margin-bottom: 1rem;
-    text-align: center;
 }
 
-.order-info {
-    text-align: center;
+/* === Бейджи статусов (В ЦВЕТАХ ПАЛИТРЫ) === */
+.status-badge {
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: 1px solid transparent;
+}
+
+/*
+   Логика цветов:
+   Фон: светлые оттенки палитры.
+   Текст: темные оттенки палитры.
+*/
+
+/* Сборка: Фон color1, текст color5 */
+.status-assembly {
+    background-color: var(--color1);
+    color: var(--color5);
+    border-color: var(--color2);
+}
+
+/* Готовится: Фон прозрачный рыжий, текст рыжий */
+.status-cooking {
+    background-color: rgba(159, 87, 39, 0.1);
+    color: var(--color3);
+    border-color: var(--color3);
+}
+
+/* Готов: Фон рыжий, текст белый (акцент) */
+.status-ready {
+    background-color: var(--color3);
+    color: var(--color0);
+}
+
+/* Подан: Фон темно-коричневый, текст белый */
+.status-served {
+    background-color: var(--color4);
+    color: var(--color0);
+}
+
+/* Отменен: Фон серый/бежевый, текст серый */
+.status-canceled {
+    background-color: var(--color2);
+    color: var(--color0);
+    opacity: 0.8;
+}
+
+/* Мета-информация */
+.header-meta {
+    display: flex;
+    gap: 30px;
+    color: var(--color4);
+    font-size: 1rem; /* Чуть компактнее шрифт */
+}
+
+.meta-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.meta-item i {
+    color: var(--color3);
+}
+
+/* === 3. Сетка товаров (без изменений) === */
+.order-items-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 25px;
     margin-bottom: 2rem;
 }
 
-.order-info p {
-    font-size: 1.2rem;
-    color: var(--color5);
-    margin: 0.5rem 0;
-}
-
-.order-items {
+.order-item-card {
+    background-color: var(--color0);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    border: 1px solid var(--color2);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
     display: flex;
-    flex-wrap: wrap;
-    gap: 20px;
-    justify-content: center;
+    flex-direction: column;
 }
 
-.order-item {
-    background-color: var(--color1);
-    border-radius: 10px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    padding: 1.5rem;
-    width: 300px;
-    text-align: center;
+.order-item-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(159, 87, 39, 0.15);
+    border-color: var(--color3);
+}
+
+.card-image-wrapper {
+    height: 180px;
+    overflow: hidden;
+    position: relative;
 }
 
 .dish-image {
     width: 100%;
-    height: 200px;
+    height: 100%;
     object-fit: cover;
-    border-radius: 10px;
-    margin-bottom: 1rem;
+    transition: transform 0.5s ease;
 }
 
-.dish-info h3 {
-    font-size: 1.5rem;
-    color: var(--color5);
-    margin-bottom: 0.5rem;
+.order-item-card:hover .dish-image {
+    transform: scale(1.05);
 }
 
-.dish-info p {
-    font-size: 1rem;
+.card-content {
+    padding: 1.2rem;
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    gap: 10px;
+}
+
+.card-content h3 {
+    margin: 0;
+    font-size: 1.2rem;
     color: var(--color5);
-    margin: 0.3rem 0;
+}
+
+.item-quantity {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.95rem;
+    color: var(--color4);
+    border-bottom: 1px dashed var(--color2);
+    padding-bottom: 8px;
+}
+
+.qty-value {
+    font-weight: 700;
+}
+
+.item-comment {
+    background-color: rgba(225, 201, 173, 0.2);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    color: var(--color5);
+    font-style: italic;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.item-comment i {
+    margin-top: 3px;
+    color: var(--color3);
+}
+
+.item-pricing {
+    margin-top: auto;
+    padding-top: 10px;
+}
+
+.price-single {
+    font-size: 0.85rem;
+    color: #777;
+    text-align: right;
+    margin-bottom: 4px;
+}
+
+.price-total {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--color3);
+    text-align: right;
 }
 
 .original-price {
     text-decoration: line-through;
-    color: var(--color3);
+    color: #999;
+    margin-right: 5px;
+    font-size: 0.9em;
 }
 
-.total-price {
-    text-align: center;
-    margin: 2rem 0;
+/* === 4. Подвал заказа (Итого) === */
+.order-footer-card {
+    background-color: var(--color0);
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.05);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 1px solid var(--color2);
 }
 
-.total-price p {
-    font-size: 2rem;
-    color: var(--color5);
-    font-weight: bold;
+.total-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0; /* Убрали лишние отступы */
 }
 
-.back-to-orders {
-    display: block;
-    text-align: center;
-    margin-top: 2rem;
+/* Надпись "Итого к оплате" */
+.total-row span:first-child {
+    color: var(--color4);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    opacity: 0.8;
+}
+
+.total-values {
+    display: flex;
+    align-items: baseline;
+    gap: 15px;
+}
+
+.total-original {
+    text-decoration: line-through;
+    color: #999;
+    font-size: 1.2rem;
+}
+
+/* Сумма заказа */
+.total-final {
+    font-size: 2.5rem; /* Сильно увеличили */
+    font-weight: 700;
+    color: var(--color3); /* Рыжий акцент */
+    font-family: 'Playfair Display', serif;
+    line-height: 1;
+}
+
+/* Стилизация кнопки "Назад" под стиль "Добавить" */
+.btn-back {
+    background-color: var(--color4) !important; /* Темный фон */
+    color: var(--color0) !important;
+    padding: 12px 30px !important;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.3s ease;
+    border: none;
+}
+
+.btn-back:hover {
+    background-color: var(--color3) !important; /* Рыжий при наведении */
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(159, 87, 39, 0.3);
+}
+
+/* === Адаптивность === */
+@media (max-width: 768px) {
+    .header-top {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .header-meta {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .order-footer-card {
+        flex-direction: column;
+        gap: 20px;
+        text-align: center;
+    }
+
+    .total-row {
+        align-items: center;
+    }
+
+    .btn-back {
+        width: 100%;
+        justify-content: center;
+    }
 }

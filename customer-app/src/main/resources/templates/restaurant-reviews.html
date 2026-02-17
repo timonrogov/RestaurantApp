@@ -1,72 +1,106 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
-  <!-- Favicon -->
-  <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+    <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+    <title>Отзывы о ресторане</title>
 
-  <title>Отзывы о ресторане</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-  <link rel="stylesheet" th:href="@{/css/common.css}">
-  <link rel="stylesheet" th:href="@{/css/restaurant-reviews.css}">
-  <link rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
-        integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw=="
-        crossorigin="anonymous"
-        referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" th:href="@{/css/common.css}">
+    <link rel="stylesheet" th:href="@{/css/restaurant-reviews.css}">
 </head>
 <body>
+
 <div th:replace="fragments/header :: header"></div>
 
-<div class="container">
-  <h1>Отзывы о ресторане</h1>
+<div class="main-container">
 
-  <!-- Если отзывов нет -->
-  <div th:if="${#lists.isEmpty(reviews)}" class="no-reviews">
-    <p>Оставьте отзыв первым!</p>
-  </div>
-
-  <!-- Если отзывы есть -->
-  <div th:unless="${#lists.isEmpty(reviews)}" class="rating-summary">
-    <div class="stars">
-      <i th:each="i : ${#numbers.sequence(1, 5)}"
-         th:classappend="${i <= averageRating} ? 'fas fa-star filled' : 'far fa-star'"></i>
-    </div>
-    <span th:text="|${averageRating} (${reviewsCount})|"></span>
-  </div>
-
-  <!-- Форма отзыва -->
-  <form th:action="@{/restaurant-reviews}" method="post" id="reviewForm">
-    <div class="rating-input">
-      <label>Оценка:</label>
-      <div class="stars">
-        <i class="far fa-star" data-value="1"></i>
-        <i class="far fa-star" data-value="2"></i>
-        <i class="far fa-star" data-value="3"></i>
-        <i class="far fa-star" data-value="4"></i>
-        <i class="far fa-star" data-value="5"></i>
-      </div>
-      <input type="hidden" name="rating" id="ratingValue">
+    <div class="reviews-page-header">
+        <h1>Отзывы о ресторане</h1>
+        <p class="subtitle">Ваши впечатления помогают нам становиться лучше</p>
     </div>
 
-    <textarea name="reviewText" placeholder="Ваш отзыв..."></textarea>
-
-    <button type="submit">Опубликовать</button>
-
-    <div class="error" style="display: none;"></div>
-  </form>
-
-  <!-- Список отзывов -->
-  <div class="reviews-list">
-    <div th:each="review : ${reviews}" class="review-item">
-      <div class="review-rating">
-        <i th:each="i : ${#numbers.sequence(1, 5)}"
-           th:classappend="${i <= review.rating} ? 'fas fa-star filled' : 'far fa-star'"></i>
-      </div>
-      <p th:text="${review.reviewText} ?: 'Без комментария'"></p>
-      <small th:text="${review.client.fullName + ', ' +
-                    #temporals.format(review.reviewTime, 'dd.MM.yyyy HH:mm')}"></small>
+    <!-- 1. Блок общего рейтинга -->
+    <div class="rating-stats-card" th:unless="${#lists.isEmpty(reviews)}">
+        <div class="stats-content">
+            <div class="stars-large">
+                <i th:each="i : ${#numbers.sequence(1, 5)}"
+                   th:classappend="${i <= averageRating} ? 'fas fa-star filled' : 'far fa-star'"></i>
+            </div>
+            <div class="stats-text">
+                <span class="avg-val" th:text="${averageRating}">4.5</span>
+                <span class="count-val" th:text="'(' + ${reviewsCount} + ' отзывов)'"></span>
+            </div>
+        </div>
     </div>
-  </div>
+
+    <!-- 2. Форма отзыва (только для авторизованных) -->
+    <div class="write-review-container" th:if="${#authorization.expression('isAuthenticated()')}">
+        <div class="form-card">
+            <h3>Оставить свой отзыв</h3>
+            <form th:action="@{/restaurant-reviews}" method="post" id="reviewForm">
+                <div class="rating-selector">
+                    <div class="stars-input">
+                        <i class="far fa-star" data-value="1"></i>
+                        <i class="far fa-star" data-value="2"></i>
+                        <i class="far fa-star" data-value="3"></i>
+                        <i class="far fa-star" data-value="4"></i>
+                        <i class="far fa-star" data-value="5"></i>
+                    </div>
+                    <input type="hidden" name="rating" id="ratingValue">
+                </div>
+
+                <textarea name="reviewText" placeholder="Расскажите, что вам понравилось..."></textarea>
+
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-paper-plane"></i> Опубликовать
+                </button>
+
+                <div class="error-inline" style="display: none;"></div>
+            </form>
+        </div>
+    </div>
+
+    <div class="guest-promo" th:unless="${#authorization.expression('isAuthenticated()')}">
+        <p><i class="fas fa-info-circle"></i> <a th:href="@{/login}">Войдите</a>, чтобы оставить свой отзыв.</p>
+    </div>
+
+    <!-- 3. Список отзывов -->
+    <div class="reviews-feed">
+        <div th:if="${#lists.isEmpty(reviews)}" class="no-reviews-placeholder">
+            <i class="fas fa-pen-fancy"></i>
+            <p>Пока нет ни одного отзыва. Будьте первыми!</p>
+        </div>
+
+        <div th:each="review : ${reviews}" class="review-bubble">
+            <div class="bubble-header">
+                <div class="user-info">
+                    <div class="user-avatar" th:text="${#strings.substring(review.client.fullName, 0, 1)}"></div>
+                    <div class="user-details">
+                        <strong th:text="${review.client.fullName}">Имя клиента</strong>
+                        <span class="review-date">
+                      <i class="far fa-calendar-alt"></i>
+                      <span th:text="${#temporals.format(review.reviewTime, 'dd.MM.yyyy')}"></span>
+                  </span>
+                    </div>
+                </div>
+                <div class="review-stars">
+                    <i th:each="i : ${#numbers.sequence(1, 5)}"
+                       th:classappend="${i <= review.rating} ? 'fas fa-star' : 'far fa-star'"></i>
+                </div>
+            </div>
+            <div class="bubble-body">
+                <p th:text="${review.reviewText} ?: 'Без комментария'"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Кнопка возврата -->
+    <div class="footer-navigation">
+        <a th:href="@{/menu}" class="btn btn-secondary">
+            <i class="fas fa-chevron-left"></i> Вернуться в меню
+        </a>
+    </div>
 </div>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>

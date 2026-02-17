@@ -88,7 +88,7 @@ $(document).ready(function() {
 
         if (targetElement.length) {
             $('html, body').animate({
-                scrollTop: targetElement.offset().top - 115 // Учитываем отступ
+                scrollTop: targetElement.offset().top - 85 // Учитываем отступ
             }, 800);
         }
     });
@@ -162,6 +162,33 @@ $(document).ready(function() {
             filterDishes($(this).val().trim());
         }, 300);
     });
+
+
+    // 1. Устанавливаем начальный текст кнопок
+        $('.read-more-btn').text('Показать описание');
+
+        // 2. Обработчик клика
+        $('.read-more-btn').on('click', function() {
+            const $btn = $(this);
+            const $text = $btn.siblings('.dish-description-text');
+
+            // Переключаем класс (показываем/скрываем)
+            $text.toggleClass('collapsed');
+
+            // Меняем текст кнопки
+            if ($text.hasClass('collapsed')) {
+                $btn.text('Показать описание');
+            } else {
+                $btn.text('Скрыть описание');
+            }
+        });
+
+        // 3. Проверка на пустые описания (если описания нет, кнопку прячем)
+        $('.dish-description-text').each(function() {
+            if ($(this).text().trim().length === 0) {
+                $(this).siblings('.read-more-btn').hide();
+            }
+        });
 });
 
 document.querySelectorAll('.stars').forEach(element => {

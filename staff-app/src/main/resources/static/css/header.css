@@ -1,0 +1,271 @@
+/* header.css */
+
+@import url('https://fonts.googleapis.com/css2?family=Lobster&display=swap');
+
+header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--header-height);
+    background-color: var(--color5);
+    color: var(--color0);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+
+    /* ИСПРАВЛЕНИЕ ЦЕНТРИРОВАНИЯ */
+    display: flex;
+    justify-content: center; /* Центрируем .header-content внутри хедера */
+    align-items: center;
+}
+
+.header-content {
+    width: 100%;
+    max-width: 1400px;
+    /* Убеждаемся, что отступы слева и справа строго одинаковые */
+    padding: 0 40px;
+    margin: 0 auto;
+    box-sizing: border-box;
+}
+
+.header-wrapper {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+/* === ЛЕВАЯ ЧАСТЬ: БРЕНД И НАВИГАЦИЯ === */
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 40px;
+}
+
+.brand-group {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    text-decoration: none;
+    transition: transform 0.3s ease;
+}
+
+.brand-group:hover {
+    transform: scale(1.02);
+}
+
+.header-logo-img {
+    height: 55px;
+    width: auto;
+    border-radius: 10px;
+    border: 2px solid var(--color2);
+}
+
+.brand-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.brand-name {
+    font-family: 'Lobster', cursive;
+    font-weight: 100;
+    font-size: 1.5rem;
+    color: var(--color1);
+    line-height: 1.1;
+}
+
+.brand-tagline {
+    font-size: 0.75rem;
+    color: var(--color2);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-weight: 600;
+}
+
+/* Навигация */
+.header-nav {
+    display: flex;
+    gap: 8px;
+}
+
+.nav-item-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    color: var(--color1);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.95rem;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+}
+
+.nav-item-link i {
+    font-size: 1.1rem;
+    color: var(--color2);
+    transition: color 0.3s;
+}
+
+.nav-item-link:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: white;
+    transform: translateY(-2px);
+}
+
+.nav-item-link:hover i {
+    color: var(--color3);
+}
+
+/* Активный пункт (можно добавить класс .active через JS) */
+.nav-item-link.active {
+    background-color: var(--color3);
+    color: white;
+}
+
+.call-nav-link {
+    position: relative;
+}
+
+/* === ПРАВАЯ ЧАСТЬ: ПРОФИЛЬ И ВЫХОД === */
+.header-right {
+    display: flex;
+    align-items: center;
+    /* Убираем любые лишние отступы справа */
+    padding-right: 0;
+}
+
+.user-controls {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+/* Пилюля профиля */
+.profile-pill {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 6px 6px 18px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(212, 174, 138, 0.2);
+    border-radius: 30px;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.profile-pill:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--color3);
+    transform: translateY(-2px);
+}
+
+.profile-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.u-name {
+    color: white;
+    font-weight: 700;
+    font-size: 0.9rem;
+    line-height: 1;
+}
+
+.u-role {
+    color: var(--color2);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    font-weight: 700;
+}
+
+.profile-icon {
+    font-size: 2rem;
+    color: var(--color2);
+    display: flex;
+    align-items: center;
+}
+
+.profile-pill:hover .profile-icon {
+    color: var(--color3);
+}
+
+.logout-form {
+    margin: 0;
+    padding: 0;
+    display: flex; /* Чтобы кнопка внутри не имела лишних зазоров */
+}
+
+/* Кнопка выхода */
+.btn-logout {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: transparent;
+    border: 1px solid var(--color2);
+    color: var(--color1);
+    padding: 8px 16px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.btn-logout:hover {
+    background: var(--error);
+    border-color: var(--error);
+    color: white;
+    transform: translateY(-2px);
+}
+
+/* Кнопка войти */
+.btn-login-header {
+    background: var(--color3);
+    color: white;
+    padding: 10px 24px;
+    border-radius: 25px;
+    text-decoration: none;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.3s ease;
+}
+
+.btn-login-header:hover {
+    background: var(--color4);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(159, 87, 39, 0.4);
+}
+
+/* Уведомление */
+.notification-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background-color: var(--error);
+    color: white;
+    font-size: 0.65rem;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--color5);
+}
+
+/* Адаптивность */
+@media (max-width: 1100px) {
+    .brand-text, .nav-item-link span {
+        display: none;
+    }
+    .header-left { gap: 20px; }
+}
+
+@media (max-width: 768px) {
+    .header-nav { display: none; }
+    .u-role { display: none; }
+}

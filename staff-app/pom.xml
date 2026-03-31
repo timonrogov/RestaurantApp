@@ -30,6 +30,12 @@
             <version>${project.version}</version>
         </dependency>
 
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>scheduler-module</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- Веб-зависимости (такие же, как у customer-app) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -34,5 +34,13 @@ public class OrderItem {
     @Column(name = "applied_discount")
     private BigDecimal appliedDiscount = BigDecimal.ZERO;
 
+    /**
+     * К какому курсу относится это блюдо в заказе.
+     * По умолчанию 1 — все блюда считаются одним курсом, если не указано иное.
+     * Официант или система может назначать разные номера курсов при оформлении.
+     */
+    @Column(name = "course_number", nullable = false)
+    private int courseNumber = 1;
+
     private double totalPrice = 0;
 }

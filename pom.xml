@@ -43,6 +43,7 @@
         <module>common-module</module>
         <module>customer-app</module>
         <module>staff-app</module>
+        <module>scheduler-module</module>
     </modules>
 
     <!-- =============================================================== -->

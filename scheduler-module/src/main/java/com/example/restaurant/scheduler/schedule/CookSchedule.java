@@ -246,6 +246,19 @@ public class CookSchedule {
         slots.addAll(backup);
     }
 
+    /**
+     * Удалить все слоты, принадлежащие заданному заказу.
+     * Вызывается DispatcherAgent при отмене заказа.
+     *
+     * @param orderId ID заказа
+     * @return true если хотя бы один слот был удалён
+     */
+    public boolean removeSlotByOrderId(long orderId) {
+        int sizeBefore = slots.size();
+        slots.removeIf(slot -> slot.getOrderId() == orderId);
+        return slots.size() < sizeBefore;
+    }
+
     @Override
     public String toString() {
         return "CookSchedule{cookId=" + cookId + ", slots=" + slots.size() + "}";

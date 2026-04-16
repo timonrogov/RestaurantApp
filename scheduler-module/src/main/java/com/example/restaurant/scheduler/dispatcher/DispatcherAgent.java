@@ -1,0 +1,397 @@
+package com.example.restaurant.scheduler.dispatcher;
+
+import com.example.restaurant.models.CookProfile;
+import com.example.restaurant.models.Equipment;
+import com.example.restaurant.models.Order;
+import com.example.restaurant.repositories.CookingTaskRepository;
+import com.example.restaurant.repositories.CookingTaskTemplateRepository;
+import com.example.restaurant.repositories.OrderCourseRepository;
+import com.example.restaurant.scheduler.agents.BaseAgent;
+import com.example.restaurant.scheduler.agents.CookAgent;
+import com.example.restaurant.scheduler.agents.EquipmentTypeAgent;
+import com.example.restaurant.scheduler.agents.OrderAgent;
+import com.example.restaurant.scheduler.agents.SceneAgent;
+import com.example.restaurant.scheduler.messages.Message;
+import com.example.restaurant.scheduler.messages.MessageType;
+import com.example.restaurant.scheduler.schedule.CookSchedule;
+import com.example.restaurant.scheduler.schedule.EquipmentTypeSchedule;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Агент-диспетчер — точка входа всей мультиагентной системы.
+ *
+ * Отвечает за:
+ *   1. Инициализацию системы: создание SceneAgent, CookAgent-ов и EquipmentTypeAgent-ов.
+ *   2. Маршрутизацию внешних событий (NEW_ORDER, COOK_UNAVAILABLE и т.д.)
+ *      от SchedulerService к нужным агентам.
+ *   3. Управление жизненным циклом OrderAgent-ов.
+ *   4. Освобождение ресурсов при отмене заказа.
+ *
+ * Хранит прямые ссылки на все созданные агенты для быстрого доступа
+ * без поиска в MessageBus.
+ *
+ * ID агента: "DISPATCHER" — единственный экземпляр в системе.
+ */
+public class DispatcherAgent extends BaseAgent {
+
+    public static final String AGENT_ID = "DISPATCHER";
+
+    // -----------------------------------------------------------------------
+    // Прямые ссылки на компоненты системы
+    // -----------------------------------------------------------------------
+
+    private final MessageBus messageBus;
+    private SceneAgent sceneAgent;
+
+    /** cookProfileId → CookAgent */
+    private final Map<Long, CookAgent> cookAgents = new HashMap<>();
+
+    /** equipmentType → EquipmentTypeAgent */
+    private final Map<String, EquipmentTypeAgent> equipmentTypeAgents = new HashMap<>();
+
+    /** orderId → OrderAgent */
+    private final Map<Long, OrderAgent> orderAgents = new HashMap<>();
+
+    // -----------------------------------------------------------------------
+    // Репозитории — передаются в OrderAgent при его создании
+    // -----------------------------------------------------------------------
+
+    private final CookingTaskRepository taskRepository;
+    private final CookingTaskTemplateRepository templateRepository;
+    private final OrderCourseRepository orderCourseRepository;
+
+    // -----------------------------------------------------------------------
+    // Конструктор
+    // -----------------------------------------------------------------------
+
+    public DispatcherAgent(MessageBus messageBus,
+                           CookingTaskRepository taskRepository,
+                           CookingTaskTemplateRepository templateRepository,
+                           OrderCourseRepository orderCourseRepository) {
+        super(AGENT_ID);
+        this.messageBus = messageBus;
+        this.taskRepository = taskRepository;
+        this.templateRepository = templateRepository;
+        this.orderCourseRepository = orderCourseRepository;
+    }
+
+    // -----------------------------------------------------------------------
+    // Диспетчеризация входящих сообщений
+    // -----------------------------------------------------------------------
+
+    @Override
+    protected void dispatch(Message message) {
+        switch (message.getType()) {
+            case NEW_ORDER          -> handleNewOrder(message);
+            case ORDER_CANCELLED    -> handleOrderCancelled(message);
+            case COOK_UNAVAILABLE   -> handleCookUnavailable(message);
+            case COOK_AVAILABLE     -> handleCookAvailable(message);
+            case EQUIPMENT_BROKEN   -> handleEquipmentBroken(message);
+            case EQUIPMENT_FIXED    -> handleEquipmentFixed(message);
+            case ALL_TASKS_PLANNED  -> handleAllTasksPlanned(message);
+            default -> log.warn("{}: получено неожиданное сообщение типа {}",
+                    agentId, message.getType());
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Инициализация системы
+    // -----------------------------------------------------------------------
+
+    /**
+     * Инициализировать всю мультиагентную систему.
+     *
+     * Вызывается из SchedulerService при старте приложения (@PostConstruct).
+     * Должна вызываться ровно один раз перед первым заказом.
+     *
+     * Последовательность:
+     *   1. Создать и зарегистрировать сам DispatcherAgent.
+     *   2. Создать и зарегистрировать SceneAgent.
+     *   3. Для каждого активного повара создать CookAgent + CookSchedule.
+     *   4. Для каждого типа оборудования создать EquipmentTypeAgent + EquipmentTypeSchedule.
+     *      (Суммируем maxParallelTasks всех единиц одного типа.)
+     *
+     * @param cooks      список активных профилей поваров из БД
+     * @param equipments список всего активного оборудования из БД
+     */
+    public void initialize(List<CookProfile> cooks, List<Equipment> equipments) {
+        log.info("{}: инициализация системы. Поваров: {}, единиц оборудования: {}",
+                agentId, cooks.size(), equipments.size());
+
+        // Регистрируем самого себя
+        messageBus.register(this);
+
+        // Создаём SceneAgent
+        sceneAgent = new SceneAgent();
+        messageBus.register(sceneAgent);
+        log.debug("{}: SceneAgent зарегистрирован", agentId);
+
+        // Создаём агентов поваров
+        for (CookProfile profile : cooks) {
+            CookSchedule schedule = new CookSchedule(profile.getId());
+            CookAgent agent = new CookAgent(profile, schedule);
+            messageBus.register(agent);
+            sceneAgent.registerCookAgent(agent, schedule);
+            cookAgents.put(profile.getId(), agent);
+        }
+        log.info("{}: зарегистрировано {} агентов поваров", agentId, cookAgents.size());
+
+        // Создаём агентов типов оборудования.
+        // Группируем Equipment по equipmentType и суммируем maxParallelTasks.
+        Map<String, Integer> capacityByType = new HashMap<>();
+        for (Equipment equipment : equipments) {
+            capacityByType.merge(
+                    equipment.getEquipmentType(),
+                    equipment.getMaxParallelTasks(),
+                    Integer::sum
+            );
+        }
+
+        for (Map.Entry<String, Integer> entry : capacityByType.entrySet()) {
+            String type = entry.getKey();
+            int totalCapacity = entry.getValue();
+
+            EquipmentTypeSchedule schedule = new EquipmentTypeSchedule(type, totalCapacity);
+            EquipmentTypeAgent agent = new EquipmentTypeAgent(type, schedule);
+            messageBus.register(agent);
+            sceneAgent.registerEquipmentTypeAgent(agent, schedule);
+            equipmentTypeAgents.put(type, agent);
+
+            log.debug("{}: тип оборудования '{}' зарегистрирован, суммарная ёмкость={}",
+                    agentId, type, totalCapacity);
+        }
+        log.info("{}: зарегистрировано {} типов оборудования", agentId, equipmentTypeAgents.size());
+
+        log.info("{}: инициализация завершена. Система готова к планированию.", agentId);
+    }
+
+    // -----------------------------------------------------------------------
+    // Обработка событий заказов
+    // -----------------------------------------------------------------------
+
+    /**
+     * Новый заказ — создать OrderAgent и запустить планирование.
+     *
+     * Тело сообщения: {@link Order} (JPA-сущность).
+     */
+    private void handleNewOrder(Message message) {
+        Order order = (Order) message.getBody();
+        log.info("{}: новый заказ #{}, стол {}", agentId, order.getId(), order.getTableNumber());
+
+        OrderAgent orderAgent = new OrderAgent(
+                order,
+                sceneAgent,
+                taskRepository,
+                templateRepository,
+                orderCourseRepository
+        );
+
+        messageBus.register(orderAgent);
+        orderAgents.put(order.getId(), orderAgent);
+
+        // Запускаем планирование через INIT
+        send(orderAgent.getAgentId(), MessageType.INIT, null);
+    }
+
+    /**
+     * Заказ отменён — освободить все его ресурсы.
+     *
+     * Тело сообщения: {@code Long orderId}.
+     *
+     * Логика:
+     *   1. Найти OrderAgent и снять с регистрации.
+     *   2. Удалить все слоты этого заказа из расписаний поваров.
+     *   3. Удалить все слоты этого заказа из расписаний оборудования.
+     *   TaskAgent-ы заказа уже сняты с регистрации самим OrderAgent-ом
+     *   при завершении курсов (если они завершились). Если не завершились —
+     *   они попытаются отправить сообщения в несуществующий OrderAgent,
+     *   MessageBus залогирует предупреждение и пропустит.
+     */
+    private void handleOrderCancelled(Message message) {
+        long orderId = (Long) message.getBody();
+        log.info("{}: отмена заказа #{}", agentId, orderId);
+
+        // Снимаем OrderAgent с регистрации
+        OrderAgent orderAgent = orderAgents.remove(orderId);
+        if (orderAgent != null) {
+            messageBus.unregister(orderAgent.getAgentId());
+            log.debug("{}: OrderAgent {} снят с регистрации", agentId, orderAgent.getAgentId());
+        } else {
+            log.warn("{}: OrderAgent для заказа #{} не найден", agentId, orderId);
+        }
+
+        // Освобождаем слоты этого заказа во всех расписаниях поваров
+        int freedCookSlots = 0;
+        for (CookAgent cookAgent : cookAgents.values()) {
+            if (cookAgent.getSchedule().removeSlotByOrderId(orderId)) {
+                freedCookSlots++;
+            }
+        }
+
+        // Освобождаем слоты этого заказа во всех расписаниях оборудования
+        int freedEquipSlots = 0;
+        for (EquipmentTypeAgent equipAgent : equipmentTypeAgents.values()) {
+            freedEquipSlots += equipAgent.getSchedule().removeSlotsByOrderId(orderId);
+        }
+
+        log.info("{}: заказ #{} отменён. Освобождено слотов поваров: {}, оборудования: {}",
+                agentId, orderId, freedCookSlots, freedEquipSlots);
+    }
+
+    /**
+     * Все задачи заказа запланированы — снять OrderAgent с регистрации.
+     *
+     * Тело сообщения: {@code Long orderId}.
+     * Отправляется OrderAgent-ом после завершения всех курсов.
+     */
+    private void handleAllTasksPlanned(Message message) {
+        long orderId = (Long) message.getBody();
+        log.info("{}: заказ #{} полностью запланирован", agentId, orderId);
+
+        OrderAgent orderAgent = orderAgents.remove(orderId);
+        if (orderAgent != null) {
+            messageBus.unregister(orderAgent.getAgentId());
+            log.debug("{}: OrderAgent {} завершил работу и снят с регистрации",
+                    agentId, orderAgent.getAgentId());
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Обработка событий поваров
+    // -----------------------------------------------------------------------
+
+    /**
+     * Повар стал недоступен (заболел, ушёл раньше).
+     *
+     * Тело сообщения: {@code Long cookProfileId}.
+     *
+     * Логика:
+     *   1. Найти CookAgent.
+     *   2. Вызвать handleCookUnavailable() — он сам разошлёт REMOVE_TASK
+     *      всем своим задачам и очистит расписание.
+     *   3. Пометить повара неактивным в SceneAgent — новые задачи
+     *      не будут ему назначаться.
+     */
+    private void handleCookUnavailable(Message message) {
+        long cookId = (Long) message.getBody();
+        log.info("{}: повар COOK_{} недоступен", agentId, cookId);
+
+        CookAgent cookAgent = cookAgents.get(cookId);
+        if (cookAgent == null) {
+            log.warn("{}: CookAgent для cookId={} не найден", agentId, cookId);
+            return;
+        }
+
+        // CookAgent сам разошлёт REMOVE_TASK своим задачам
+        cookAgent.handleCookUnavailable();
+
+        // Помечаем в SceneAgent — новые запросы вариантов его не получат
+        sceneAgent.markCookInactive(cookId);
+    }
+
+    /**
+     * Повар снова доступен.
+     *
+     * Тело сообщения: {@code Long cookProfileId}.
+     */
+    private void handleCookAvailable(Message message) {
+        long cookId = (Long) message.getBody();
+        log.info("{}: повар COOK_{} снова доступен", agentId, cookId);
+
+        CookAgent cookAgent = cookAgents.get(cookId);
+        if (cookAgent == null) {
+            log.warn("{}: CookAgent для cookId={} не найден", agentId, cookId);
+            return;
+        }
+
+        sceneAgent.markCookActive(cookId);
+        log.info("{}: COOK_{} помечен активным, теперь принимает новые задачи", agentId, cookId);
+    }
+
+    // -----------------------------------------------------------------------
+    // Обработка событий оборудования
+    // -----------------------------------------------------------------------
+
+    /**
+     * Единица оборудования сломана.
+     *
+     * Тело сообщения: {@link Equipment} (JPA-сущность сломавшейся единицы).
+     *
+     * Логика:
+     *   1. Найти EquipmentTypeAgent для типа сломавшегося оборудования.
+     *   2. Вызвать handleEquipmentBroken(brokenCapacity) — агент сам
+     *      уменьшит ёмкость и при необходимости разошлёт REMOVE_TASK задачам.
+     *   3. Обновить ёмкость в SceneAgent.
+     */
+    private void handleEquipmentBroken(Message message) {
+        Equipment equipment = (Equipment) message.getBody();
+        String type = equipment.getEquipmentType();
+        int brokenCapacity = equipment.getMaxParallelTasks();
+
+        log.info("{}: оборудование '{}' типа '{}' сломано (ёмкость: -{})",
+                agentId, equipment.getName(), type, brokenCapacity);
+
+        EquipmentTypeAgent agent = equipmentTypeAgents.get(type);
+        if (agent == null) {
+            log.warn("{}: EquipmentTypeAgent для типа '{}' не найден", agentId, type);
+            return;
+        }
+
+        // Агент сам вытеснит лишние задачи если ёмкость стала меньше загрузки
+        agent.handleEquipmentBroken(brokenCapacity);
+
+        // Обновляем ёмкость в SceneAgent для корректной маршрутизации
+        sceneAgent.decreaseEquipmentCapacity(type, brokenCapacity);
+    }
+
+    /**
+     * Единица оборудования починена.
+     *
+     * Тело сообщения: {@link Equipment} (JPA-сущность починенной единицы).
+     */
+    private void handleEquipmentFixed(Message message) {
+        Equipment equipment = (Equipment) message.getBody();
+        String type = equipment.getEquipmentType();
+        int restoredCapacity = equipment.getMaxParallelTasks();
+
+        log.info("{}: оборудование '{}' типа '{}' починено (ёмкость: +{})",
+                agentId, equipment.getName(), type, restoredCapacity);
+
+        EquipmentTypeAgent agent = equipmentTypeAgents.get(type);
+        if (agent == null) {
+            log.warn("{}: EquipmentTypeAgent для типа '{}' не найден", agentId, type);
+            return;
+        }
+
+        agent.handleEquipmentFixed(restoredCapacity);
+        sceneAgent.increaseEquipmentCapacity(type, restoredCapacity);
+    }
+
+    // -----------------------------------------------------------------------
+    // Утилиты для SchedulerService
+    // -----------------------------------------------------------------------
+
+    /**
+     * Проверить инициализирован ли диспетчер.
+     * SchedulerService вызывает этот метод перед первым использованием.
+     */
+    public boolean isInitialized() {
+        return sceneAgent != null;
+    }
+
+    /**
+     * Число активных OrderAgent-ов (заказов в процессе планирования).
+     * Используется для мониторинга и тестов.
+     */
+    public int getActiveOrderCount() {
+        return orderAgents.size();
+    }
+
+    /** Получить SceneAgent — нужен TaskAgent-у как прямая ссылка. */
+    public SceneAgent getSceneAgent() {
+        return sceneAgent;
+    }
+}

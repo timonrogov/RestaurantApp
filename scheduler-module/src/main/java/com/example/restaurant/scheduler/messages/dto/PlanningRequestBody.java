@@ -24,11 +24,20 @@ public class PlanningRequestBody {
      */
     private final PlacementVariant chosenVariant;
 
-    public PlanningRequestBody(long taskId, PlacementVariant chosenVariant) {
+    /**
+     * ID заказа, которому принадлежит задача.
+     * Нужен CookAgent-у при создании ScheduleSlot — orderId хранится в слоте
+     * для проверки вытеснения в будущих переговорах (своих вытеснять нельзя).
+     */
+    private final long orderId;
+
+    public PlanningRequestBody(long taskId, PlacementVariant chosenVariant, long orderId) {
         this.taskId = taskId;
         this.chosenVariant = chosenVariant;
+        this.orderId = orderId;
     }
 
     public long getTaskId() { return taskId; }
     public PlacementVariant getChosenVariant() { return chosenVariant; }
+    public long getOrderId() { return orderId; }
 }

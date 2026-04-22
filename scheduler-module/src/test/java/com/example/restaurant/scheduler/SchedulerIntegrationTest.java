@@ -16,8 +16,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
@@ -48,36 +47,64 @@ class SchedulerIntegrationTest {
     // Фиксированное время для предсказуемых тестов
     private final LocalDateTime NOW = LocalDateTime.of(2025, 1, 1, 12, 0);
 
+    private Map<Long, CookingTask> fakeTaskDb;
+    private long taskIdCounter;
+
     @BeforeEach
     void setUp() {
-        // Создаём шину сообщений
+        // 1. Создаём шину сообщений
         messageBus = new MessageBus();
 
-        // Мокируем все репозитории
+        // 2. Мокируем все репозитории (Создаем их!)
         taskRepository       = mock(CookingTaskRepository.class);
         templateRepository   = mock(CookingTaskTemplateRepository.class);
         orderCourseRepository = mock(OrderCourseRepository.class);
         orderRepository      = mock(OrderRepository.class);
 
-        // save() должен возвращать переданный объект с проставленным ID
-        when(taskRepository.save(any(CookingTask.class))).thenAnswer(inv -> {
-            CookingTask t = inv.getArgument(0);
-            if (t.getId() == null) {
-                // Имитируем выдачу ID при первом сохранении
+        // 3. Инициализируем нашу фейковую БД
+        fakeTaskDb = new HashMap<>();
+        taskIdCounter = 1L;
+
+        // 4. Учим taskRepository сохранять в фейковую БД
+        when(taskRepository.save(any(CookingTask.class))).thenAnswer(invocation -> {
+            CookingTask task = invocation.getArgument(0);
+
+            // Если это новая задача (без ID), выдаем ей ID
+            if (task.getId() == null) {
                 try {
                     var idField = CookingTask.class.getDeclaredField("id");
                     idField.setAccessible(true);
-                    idField.set(t, (long)(System.nanoTime() % 10000));
+                    idField.set(task, taskIdCounter++);
                 } catch (Exception ignored) {}
             }
-            return t;
+
+            // Сохраняем в нашу фейковую мапу
+            fakeTaskDb.put(task.getId(), task);
+            return task;
         });
 
-        // Курсов по умолчанию нет → OrderAgent создаст один курс автоматически
+        // 5. Учим taskRepository искать по списку ID
+        when(taskRepository.findAllById(any())).thenAnswer(invocation -> {
+            Iterable<Long> ids = invocation.getArgument(0);
+            List<CookingTask> result = new ArrayList<>();
+            for (Long id : ids) {
+                if (fakeTaskDb.containsKey(id)) {
+                    result.add(fakeTaskDb.get(id));
+                }
+            }
+            return result;
+        });
+
+        // 6. Учим taskRepository отдавать всё (на всякий случай)
+        when(taskRepository.findAll()).thenAnswer(invocation ->
+                new ArrayList<>(fakeTaskDb.values())
+        );
+
+        // 7. Остальные базовые настройки
         when(orderCourseRepository.findByOrderIdOrderByCourseNumberAsc(anyLong()))
                 .thenReturn(List.of());
 
-        // Создаём и регистрируем DispatcherAgent
+        // 8. Создаём и регистрируем DispatcherAgent
         dispatcher = new DispatcherAgent(messageBus, taskRepository, templateRepository, orderCourseRepository);
         messageBus.register(dispatcher);
     }
@@ -134,42 +161,30 @@ class SchedulerIntegrationTest {
     @Test
     @DisplayName("Сценарий 2: 2 повара, один занят → задача идёт к свободному")
     void scenario2_preferLessLoadedCook() {
-        // Повар 1 (занятый): слот 60 минут
         CookProfile cook1 = buildCookProfile(1L, CookSpecialization.UNIVERSAL);
-        CookSchedule schedule1 = new CookSchedule(1L);
+        CookProfile cook2 = buildCookProfile(2L, CookSpecialization.UNIVERSAL);
+
+        // 1. Пусть Диспетчер сам всё создаст
+        dispatcher.initialize(List.of(cook1, cook2), List.of());
+
+        // 2. Достаем расписание 1-го повара из Сцены и "забиваем" его на час вперед
+        CookSchedule schedule1 = dispatcher.getSceneAgent().getCookSchedule(1L);
         schedule1.addSlot(new com.example.restaurant.scheduler.schedule.ScheduleSlot(
                 999L, 999L, LocalDateTime.now(), LocalDateTime.now().plusMinutes(60), null));
-        CookAgent agent1 = new CookAgent(cook1, schedule1);
-        messageBus.register(agent1);
 
-        // Повар 2 (свободный)
-        CookProfile cook2 = buildCookProfile(2L, CookSpecialization.UNIVERSAL);
-        CookSchedule schedule2 = new CookSchedule(2L);
-        CookAgent agent2 = new CookAgent(cook2, schedule2);
-        messageBus.register(agent2);
-
-        sceneAgent = new SceneAgent();
-        messageBus.register(sceneAgent);
-        sceneAgent.registerCookAgent(agent1, schedule1);
-        sceneAgent.registerCookAgent(agent2, schedule2);
-
-        CookingTaskTemplate template = buildTemplate(1L, 1, "Приготовление", 15,
-                CookSpecialization.UNIVERSAL, null);
+        CookingTaskTemplate template = buildTemplate(1L, 1, "Приготовление", 15, CookSpecialization.UNIVERSAL, null);
         Dish dish = buildDish(1L, "Салат");
         OrderItem orderItem = buildOrderItem(1L, dish, 1);
         Order order = buildOrder(1L, List.of(orderItem));
 
         when(templateRepository.findByDishIdOrderByStepNumberAsc(1L)).thenReturn(List.of(template));
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
 
-        OrderAgent orderAgent = new OrderAgent(order, sceneAgent, taskRepository,
-                templateRepository, orderCourseRepository);
-        messageBus.register(orderAgent);
-
-        dispatcher.initialize(List.of(cook1, cook2), List.of());
-        messageBus.deliver(dispatcher.getAgentId(), new Message(MessageType.NEW_ORDER, order, "TEST"));
+        // 3. Act: Просто кидаем NEW_ORDER в шину (Диспетчер сам создаст OrderAgent)
+        messageBus.deliver(DispatcherAgent.AGENT_ID, new Message(MessageType.NEW_ORDER, order, "TEST"));
         messageBus.processAll();
 
-        // Assert: задача назначена свободному повару (cook2, id=2)
+        // Assert: задача назначена свободному повару (cook2, id=2L)
         verify(taskRepository, atLeastOnce()).save(argThat(task ->
                 task.getStatus() == CookingTaskStatus.PLANNED
                         && task.getAssignedCook() != null
@@ -185,19 +200,10 @@ class SchedulerIntegrationTest {
     @DisplayName("Сценарий 3: 2 курса с syncGap=15 мин → второй курс начинается позже")
     void scenario3_courseSync_secondCourseStartsAfterGap() {
         CookProfile cook = buildCookProfile(1L, CookSpecialization.UNIVERSAL);
-        CookSchedule cookSchedule = new CookSchedule(1L);
-        CookAgent cookAgent = new CookAgent(cook, cookSchedule);
-        messageBus.register(cookAgent);
+        dispatcher.initialize(List.of(cook), List.of());
 
-        sceneAgent = new SceneAgent();
-        messageBus.register(sceneAgent);
-        sceneAgent.registerCookAgent(cookAgent, cookSchedule);
-
-        // Два блюда: курс 1 и курс 2
-        CookingTaskTemplate tmpl1 = buildTemplate(1L, 1, "Подача закуски", 10,
-                CookSpecialization.UNIVERSAL, null);
-        CookingTaskTemplate tmpl2 = buildTemplate(2L, 1, "Подача основного", 15,
-                CookSpecialization.UNIVERSAL, null);
+        CookingTaskTemplate tmpl1 = buildTemplate(1L, 1, "Подача закуски", 10, CookSpecialization.UNIVERSAL, null);
+        CookingTaskTemplate tmpl2 = buildTemplate(2L, 1, "Подача основного", 15, CookSpecialization.UNIVERSAL, null);
 
         Dish dish1 = buildDish(1L, "Салат Цезарь");
         Dish dish2 = buildDish(2L, "Стейк");
@@ -209,46 +215,37 @@ class SchedulerIntegrationTest {
 
         when(templateRepository.findByDishIdOrderByStepNumberAsc(1L)).thenReturn(List.of(tmpl1));
         when(templateRepository.findByDishIdOrderByStepNumberAsc(2L)).thenReturn(List.of(tmpl2));
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(order)); // ВАЖНО: не забываем мок для заказа
 
-        // Настраиваем курсы: gap=15 мин между первым и вторым
         OrderCourse course1 = buildOrderCourse(1L, order, 1, 0);
         OrderCourse course2 = buildOrderCourse(2L, order, 2, 15);
         when(orderCourseRepository.findByOrderIdOrderByCourseNumberAsc(1L))
                 .thenReturn(List.of(course1, course2));
 
-        OrderAgent orderAgent = new OrderAgent(order, sceneAgent, taskRepository,
-                templateRepository, orderCourseRepository);
-        messageBus.register(orderAgent);
-
-        dispatcher.initialize(List.of(cook), List.of());
-        messageBus.deliver(dispatcher.getAgentId(), new Message(MessageType.NEW_ORDER, order, "TEST"));
+        // Act
+        messageBus.deliver(DispatcherAgent.AGENT_ID, new Message(MessageType.NEW_ORDER, order, "TEST"));
         messageBus.processAll();
 
-        // Собираем все сохранённые задачи
+        // Assert
         var savedTasks = org.mockito.ArgumentCaptor.forClass(CookingTask.class);
         verify(taskRepository, atLeast(2)).save(savedTasks.capture());
 
         List<CookingTask> planned = savedTasks.getAllValues().stream()
-                .filter(t -> t.getStatus() == CookingTaskStatus.PLANNED
-                        && t.getPlannedStartTime() != null)
+                .filter(t -> t.getStatus() == CookingTaskStatus.PLANNED && t.getPlannedStartTime() != null)
                 .toList();
 
-        // Задача 1 курса и задача 2 курса должны иметь разные стартовые времена
         assertThat(planned).hasSizeGreaterThanOrEqualTo(2);
 
         LocalDateTime course1End = planned.stream()
                 .filter(t -> t.getOrderItem().getCourseNumber() == 1)
                 .map(CookingTask::getPlannedEndTime)
-                .max(LocalDateTime::compareTo)
-                .orElseThrow();
+                .max(LocalDateTime::compareTo).orElseThrow();
 
         LocalDateTime course2Start = planned.stream()
                 .filter(t -> t.getOrderItem().getCourseNumber() == 2)
                 .map(CookingTask::getPlannedStartTime)
-                .min(LocalDateTime::compareTo)
-                .orElseThrow();
+                .min(LocalDateTime::compareTo).orElseThrow();
 
-        // Второй курс должен начаться не раньше чем конец первого + 15 мин
         assertThat(course2Start).isAfterOrEqualTo(course1End.plusMinutes(15));
     }
 
@@ -262,47 +259,36 @@ class SchedulerIntegrationTest {
         CookProfile cook1 = buildCookProfile(1L, CookSpecialization.UNIVERSAL);
         CookProfile cook2 = buildCookProfile(2L, CookSpecialization.UNIVERSAL);
 
-        CookSchedule schedule1 = new CookSchedule(1L);
-        CookSchedule schedule2 = new CookSchedule(2L);
+        dispatcher.initialize(List.of(cook1, cook2), List.of());
 
-        CookAgent agent1 = new CookAgent(cook1, schedule1);
-        CookAgent agent2 = new CookAgent(cook2, schedule2);
-
-        messageBus.register(agent1);
-        messageBus.register(agent2);
-
-        sceneAgent = new SceneAgent();
-        messageBus.register(sceneAgent);
-        sceneAgent.registerCookAgent(agent1, schedule1);
-        sceneAgent.registerCookAgent(agent2, schedule2);
-
-        CookingTaskTemplate template = buildTemplate(1L, 1, "Готовка", 10,
-                CookSpecialization.UNIVERSAL, null);
+        CookingTaskTemplate template = buildTemplate(1L, 1, "Готовка", 10, CookSpecialization.UNIVERSAL, null);
         Dish dish = buildDish(1L, "Суп");
         OrderItem item = buildOrderItem(1L, dish, 1);
         Order order = buildOrder(1L, List.of(item));
 
         when(templateRepository.findByDishIdOrderByStepNumberAsc(1L)).thenReturn(List.of(template));
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
 
-        OrderAgent orderAgent = new OrderAgent(order, sceneAgent, taskRepository,
-                templateRepository, orderCourseRepository);
-        messageBus.register(orderAgent);
-
-        // Планируем заказ
-        dispatcher.initialize(List.of(cook1, cook2), List.of());
-        messageBus.deliver(dispatcher.getAgentId(), new Message(MessageType.NEW_ORDER, order, "TEST"));
+        // Act 1: Планируем заказ
+        messageBus.deliver(DispatcherAgent.AGENT_ID, new Message(MessageType.NEW_ORDER, order, "TEST"));
         messageBus.processAll();
 
-        // Повар 1 стал недоступен
-        messageBus.deliver(dispatcher.getAgentId(),
-                new Message(MessageType.COOK_UNAVAILABLE, 1L, "TEST"));
+        // Узнаем, кому назначилась задача (cook1 или cook2)
+        var captor = org.mockito.ArgumentCaptor.forClass(CookingTask.class);
+        verify(taskRepository, atLeastOnce()).save(captor.capture());
+
+        long assignedCookId = captor.getValue().getAssignedCook().getId();
+        long otherCookId = (assignedCookId == 1L) ? 2L : 1L; // Это тот повар, который останется
+
+        // Act 2: Повар, взявший задачу, уходит домой (имитируем сигнал от админа)
+        messageBus.deliver(DispatcherAgent.AGENT_ID, new Message(MessageType.COOK_UNAVAILABLE, assignedCookId, "TEST"));
         messageBus.processAll();
 
-        // Задача должна перепланироваться на повара 2
+        // Assert: задача перепланировалась на оставшегося повара
         verify(taskRepository, atLeastOnce()).save(argThat(task ->
                 task.getStatus() == CookingTaskStatus.PLANNED
                         && task.getAssignedCook() != null
-                        && task.getAssignedCook().getId() == 2L
+                        && task.getAssignedCook().getId() == otherCookId
         ));
     }
 

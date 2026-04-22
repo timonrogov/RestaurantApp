@@ -258,9 +258,7 @@ public class OrderAgent extends BaseAgent {
         log.debug("{}: курс {}, notBefore={}, deadline={}", agentId, current.courseNumber, notBefore, deadline);
 
         // Загружаем все задачи курса из БД и создаём для каждой TaskAgent
-        List<CookingTask> tasks = taskRepository.findAll().stream()
-                .filter(t -> current.taskIds.contains(t.getId()))
-                .toList();
+        List<CookingTask> tasks = taskRepository.findAllById(current.taskIds);
 
         // === ИСПРАВЛЕНИЕ: ВЫЧИСЛЯЕМ УМНЫЙ ДЕДЛАЙН (targetEndTime) ===
         int maxDuration = tasks.stream()
@@ -438,8 +436,8 @@ public class OrderAgent extends BaseAgent {
      */
     private void onCourseCompleted() {
         // Снимаем с регистрации TaskAgent-ов завершённого курса
-        CourseState completedCourse = courseStates.get(currentCourseIndex);
-        unregisterTaskAgentsForCourse(completedCourse);
+        /*CourseState completedCourse = courseStates.get(currentCourseIndex);
+        unregisterTaskAgentsForCourse(completedCourse);*/
 
         currentCourseIndex++;
 

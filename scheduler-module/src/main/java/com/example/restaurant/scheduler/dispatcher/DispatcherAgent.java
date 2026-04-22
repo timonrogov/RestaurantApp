@@ -254,12 +254,12 @@ public class DispatcherAgent extends BaseAgent {
         long orderId = (Long) message.getBody();
         log.info("{}: заказ #{} полностью запланирован", agentId, orderId);
 
-        OrderAgent orderAgent = orderAgents.remove(orderId);
+        /*OrderAgent orderAgent = orderAgents.remove(orderId);
         if (orderAgent != null) {
             messageBus.unregister(orderAgent.getAgentId());
             log.debug("{}: OrderAgent {} завершил работу и снят с регистрации",
                     agentId, orderAgent.getAgentId());
-        }
+        }*/
     }
 
     /**
@@ -284,6 +284,10 @@ public class DispatcherAgent extends BaseAgent {
                 log.debug("{}: слот задачи #{} удален у оборудования {}", agentId, taskId, equipAgent.getAgentId());
             }
         }
+
+        // Теперь задача физически завершена, убиваем её агента!
+        messageBus.unregister("TASK_" + taskId);
+        log.debug("{}: TaskAgent TASK_{} завершил миссию и снят с регистрации", agentId, taskId);
     }
 
     // -----------------------------------------------------------------------

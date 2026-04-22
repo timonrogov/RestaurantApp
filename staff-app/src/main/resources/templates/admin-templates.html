@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+    <title>Этапы приготовления | Бобр и Точка!</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" th:href="@{/css/common.css}">
+    <link rel="stylesheet" th:href="@{/css/admin-scheduler.css}">
+    <meta th:name="_csrf"        th:content="${_csrf.token}"/>
+    <meta th:name="_csrf_header" th:content="${_csrf.headerName}"/>
+</head>
+<body>
+<div th:replace="fragments/header :: header"></div>
+
+<div class="main-container">
+
+    <!-- Хлебные крошки + заголовок -->
+    <div class="sched-page-header">
+        <div>
+            <div class="sched-breadcrumb">
+                <a th:href="@{/admin/dishes}"><i class="fas fa-book-open"></i> Меню</a>
+                <span>/</span>
+                <span th:text="${dish.name}">Блюдо</span>
+                <span>/</span>
+                <span>Этапы приготовления</span>
+            </div>
+            <h1><i class="fas fa-list-ol"></i> Этапы приготовления</h1>
+            <p class="sched-subtitle" th:text="${dish.name}"></p>
+        </div>
+        <a th:href="@{/admin/dishes}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Назад к меню
+        </a>
+    </div>
+
+    <!-- Flash-сообщения -->
+    <div th:if="${success}" class="sched-alert sched-alert-success">
+        <i class="fas fa-check-circle"></i> <span th:text="${success}"></span>
+    </div>
+    <div th:if="${error}" class="sched-alert sched-alert-error">
+        <i class="fas fa-exclamation-circle"></i> <span th:text="${error}"></span>
+    </div>
+
+    <div class="sched-two-col">
+
+        <!-- Список существующих этапов -->
+        <div class="sched-card">
+            <div class="sched-card-header">
+                <i class="fas fa-tasks"></i>
+                Текущие этапы
+                <span class="sched-count" th:text="${templates.size()}">0</span>
+            </div>
+
+            <div th:if="${templates.isEmpty()}" class="sched-empty">
+                <i class="fas fa-plus-circle"></i>
+                <p>Этапы не добавлены. Добавьте первый этап справа.</p>
+            </div>
+
+            <div class="sched-template-list">
+                <div th:each="tmpl : ${templates}" class="sched-template-row">
+                    <div class="sched-step-num" th:text="${tmpl.stepNumber}">1</div>
+                    <div class="sched-template-info">
+                        <div class="sched-template-name" th:text="${tmpl.stepName}">Нарезка</div>
+                        <div class="sched-template-meta">
+                            <span><i class="fas fa-clock"></i> <strong th:text="${tmpl.durationMinutes}">10</strong> мин</span>
+                            <span class="sched-spec-badge" th:text="${tmpl.requiredSpecialization.displayName}">Цех</span>
+                            <span th:if="${tmpl.requiredEquipmentType != null}"
+                                  class="sched-equip-badge"
+                                  th:text="${tmpl.requiredEquipmentType}">OVEN</span>
+                        </div>
+                    </div>
+                    <form th:action="@{/admin/dishes/{d}/templates/{t}/delete(d=${dish.id},t=${tmpl.id})}"
+                          method="post">
+                        <button type="submit" class="btn btn-danger btn-sm"
+                                onclick="return confirm('Удалить этот этап?')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Форма добавления нового этапа -->
+        <div class="sched-card">
+            <div class="sched-card-header">
+                <i class="fas fa-plus"></i> Добавить этап
+            </div>
+            <form th:action="@{/admin/dishes/{d}/templates(d=${dish.id})}" method="post" class="sched-form">
+
+                <div class="sched-form-row">
+                    <div class="sched-form-group sched-form-group--small">
+                        <label>Номер шага</label>
+                        <input type="number" name="stepNumber" min="1" value="1" required>
+                    </div>
+                    <div class="sched-form-group sched-form-group--grow">
+                        <label>Название этапа</label>
+                        <input type="text" name="stepName" placeholder="Жарка на гриле" required>
+                    </div>
+                </div>
+
+                <div class="sched-form-row">
+                    <div class="sched-form-group">
+                        <label>Длительность (мин)</label>
+                        <input type="number" name="durationMinutes" min="1" value="10" required>
+                    </div>
+                    <div class="sched-form-group">
+                        <label>Специализация повара</label>
+                        <select name="requiredSpecialization" required>
+                            <option th:each="spec : ${specializations}"
+                                    th:value="${spec.name()}"
+                                    th:text="${spec.displayName}">Цех</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="sched-form-group">
+                    <label>Тип оборудования <span class="sched-optional">(оставьте пустым если не нужно)</span></label>
+                    <input type="text" name="requiredEquipmentType"
+                           placeholder="OVEN, GRILL, FRYER, STOVE...">
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width:100%">
+                    <i class="fas fa-plus"></i> Добавить этап
+                </button>
+            </form>
+        </div>
+
+    </div>
+</div>
+</body>
+</html>

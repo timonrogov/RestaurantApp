@@ -33,6 +33,13 @@
                         <span>KDS</span>
                     </a>
 
+                    <a th:href="@{/admin/scheduler}"
+                       sec:authorize="hasRole('ADMIN')"
+                       class="nav-item-link">
+                        <i class="fas fa-project-diagram"></i>
+                        <span>Планировщик</span>
+                    </a>
+
                     <a th:href="@{/admin/calls}"
                        sec:authorize="hasAnyRole('WAITER', 'ADMIN')"
                        class="nav-item-link call-nav-link">

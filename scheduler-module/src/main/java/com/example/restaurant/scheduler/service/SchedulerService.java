@@ -163,6 +163,11 @@ public class SchedulerService {
         dispatchAndProcess(MessageType.COOK_AVAILABLE, cookProfileId);
     }
 
+    public void addOrUpdateCook(CookProfile profile) {
+        log.info("SchedulerService: добавлен/обновлен повар {}", profile.getId());
+        dispatchAndProcess(MessageType.COOK_CREATED, profile);
+    }
+
     // -----------------------------------------------------------------------
     // Управление оборудованием
     // -----------------------------------------------------------------------
@@ -191,6 +196,11 @@ public class SchedulerService {
         log.info("SchedulerService: оборудование '{}' (тип '{}') починено",
                 equipment.getName(), equipment.getEquipmentType());
         dispatchAndProcess(MessageType.EQUIPMENT_FIXED, equipment);
+    }
+
+    public void addEquipment(Equipment equipment) {
+        log.info("SchedulerService: добавлено новое оборудование {}", equipment.getName());
+        dispatchAndProcess(MessageType.EQUIPMENT_CREATED, equipment);
     }
 
     // -----------------------------------------------------------------------

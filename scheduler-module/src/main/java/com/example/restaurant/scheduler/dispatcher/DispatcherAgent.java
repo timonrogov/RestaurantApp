@@ -93,6 +93,8 @@ public class DispatcherAgent extends BaseAgent {
             case EQUIPMENT_FIXED    -> handleEquipmentFixed(message);
             case ALL_TASKS_PLANNED  -> handleAllTasksPlanned(message);
             case TASK_DONE_EVENT    -> handleTaskDone(message);
+            case COOK_CREATED       -> handleCookCreated(message);
+            case EQUIPMENT_CREATED  -> handleEquipmentCreated(message);
             default -> log.warn("{}: получено неожиданное сообщение типа {}",
                     agentId, message.getType());
         }
@@ -369,7 +371,8 @@ public class DispatcherAgent extends BaseAgent {
         agent.handleEquipmentBroken(brokenCapacity);
 
         // Обновляем ёмкость в SceneAgent для корректной маршрутизации
-        sceneAgent.decreaseEquipmentCapacity(type, brokenCapacity);
+        // (эта строка вычитала емкость второй раз)
+        //sceneAgent.decreaseEquipmentCapacity(type, brokenCapacity);
     }
 
     /**
@@ -392,7 +395,55 @@ public class DispatcherAgent extends BaseAgent {
         }
 
         agent.handleEquipmentFixed(restoredCapacity);
-        sceneAgent.increaseEquipmentCapacity(type, restoredCapacity);
+        // (эта строка прибавляла емкость второй раз)
+        //sceneAgent.increaseEquipmentCapacity(type, restoredCapacity);
+    }
+
+
+    // -----------------------------------------------------------------------
+    // Обработка создания нового повара и оборудования
+    // -----------------------------------------------------------------------
+
+
+    private void handleCookCreated(Message message) {
+        CookProfile profile = (CookProfile) message.getBody();
+        long cookId = profile.getId();
+
+        if (cookAgents.containsKey(cookId)) {
+            // Повар уже есть в памяти (например, ему поменяли специализацию)
+            cookAgents.get(cookId).setCookProfile(profile);
+            log.info("{}: профиль повара COOK_{} обновлен в памяти", agentId, cookId);
+        } else {
+            // Рождаем нового агента!
+            CookSchedule schedule = new CookSchedule(cookId);
+            CookAgent agent = new CookAgent(profile, schedule);
+            messageBus.register(agent);
+            sceneAgent.registerCookAgent(agent, schedule);
+            cookAgents.put(cookId, agent);
+            log.info("{}: НОВЫЙ повар COOK_{} зарегистрирован и готов к работе!", agentId, cookId);
+        }
+    }
+
+    private void handleEquipmentCreated(Message message) {
+        Equipment equipment = (Equipment) message.getBody();
+        String type = equipment.getEquipmentType();
+        int capacity = equipment.getMaxParallelTasks();
+
+        EquipmentTypeAgent existingAgent = equipmentTypeAgents.get(type);
+        if (existingAgent != null) {
+            // Такой тип уже есть, просто плюсуем ёмкость
+            existingAgent.getSchedule().increaseCapacity(capacity);
+            log.info("{}: ёмкость оборудования '{}' увеличена на {} (куплено новое)",
+                    agentId, type, capacity);
+        } else {
+            // Абсолютно новый тип оборудования
+            EquipmentTypeSchedule schedule = new EquipmentTypeSchedule(type, capacity);
+            EquipmentTypeAgent agent = new EquipmentTypeAgent(type, schedule);
+            messageBus.register(agent);
+            sceneAgent.registerEquipmentTypeAgent(agent, schedule);
+            equipmentTypeAgents.put(type, agent);
+            log.info("{}: зарегистрирован НОВЫЙ тип оборудования '{}'", agentId, type);
+        }
     }
 
     // -----------------------------------------------------------------------

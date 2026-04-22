@@ -226,4 +226,16 @@ public enum MessageType {
      * Повар сообщил о задержке — пересчитать notBefore зависимых задач.
      */
     TASK_DELAY_EVENT,
+
+    /**
+     * SchedulerService → DispatcherAgent.
+     * Зарегистрирован новый повар или обновлена его специализация.
+     */
+    COOK_CREATED,
+
+    /**
+     * SchedulerService → DispatcherAgent.
+     * Куплено новое оборудование.
+     */
+    EQUIPMENT_CREATED
 }

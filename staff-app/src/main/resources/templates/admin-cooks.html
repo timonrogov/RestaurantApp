@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+    <title>Профили поваров | Бобр и Точка!</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" th:href="@{/css/common.css}">
+    <link rel="stylesheet" th:href="@{/css/admin-scheduler.css}">
+    <meta th:name="_csrf"        th:content="${_csrf.token}"/>
+    <meta th:name="_csrf_header" th:content="${_csrf.headerName}"/>
+</head>
+<body>
+<div th:replace="fragments/header :: header"></div>
+
+<div class="main-container">
+    <div class="sched-page-header">
+        <div>
+            <h1><i class="fas fa-user-cog"></i> Профили поваров</h1>
+            <p class="sched-subtitle">Назначение специализаций и управление доступностью</p>
+        </div>
+    </div>
+
+    <div th:if="${success}" class="sched-alert sched-alert-success">
+        <i class="fas fa-check-circle"></i> <span th:text="${success}"></span>
+    </div>
+
+    <div class="sched-grid-3">
+        <div th:each="cook : ${cooks}" class="sched-card sched-cook-card">
+
+            <!-- Заголовок карточки -->
+            <div class="sched-card-header">
+                <i class="fas fa-user-circle"></i>
+                <span th:text="${cook.fullName}">Иванов А.П.</span>
+            </div>
+
+            <div class="sched-cook-body">
+                <!-- Текущий профиль если есть -->
+                <div th:with="profile=${profiles.?[employee.id == __${cook.id}__].empty ? null : profiles.?[employee.id == __${cook.id}__][0]}">
+
+                    <div th:if="${profile != null}" class="sched-current-profile">
+                        <div class="sched-profile-spec">
+                            <span class="sched-spec-badge" th:text="${profile.specialization.displayName}">Цех</span>
+                            <span th:if="${profile.active}" class="sched-status-active">
+                                <i class="fas fa-circle"></i> Доступен
+                            </span>
+                            <span th:unless="${profile.active}" class="sched-status-inactive">
+                                <i class="fas fa-circle"></i> Недоступен
+                            </span>
+                        </div>
+
+                        <!-- Переключить доступность -->
+                        <form th:action="@{/admin/cooks/{id}/toggle(id=${profile.id})}" method="post">
+                            <button type="submit"
+                                    th:class="${profile.active} ? 'btn btn-sm btn-danger' : 'btn btn-sm btn-success'">
+                                <i th:class="${profile.active} ? 'fas fa-user-times' : 'fas fa-user-check'"></i>
+                                <span th:text="${profile.active} ? 'Пометить недоступным' : 'Пометить доступным'"></span>
+                            </button>
+                        </form>
+                    </div>
+
+                    <div th:if="${profile == null}" class="sched-no-profile">
+                        <i class="fas fa-info-circle"></i> Профиль не назначен
+                    </div>
+
+                    <!-- Форма назначения/обновления специализации -->
+                    <form th:action="@{/admin/cooks/{id}/profile(id=${cook.id})}" method="post" class="sched-spec-form">
+                        <select name="specialization">
+                            <option th:each="spec : ${specializations}"
+                                    th:value="${spec.name()}"
+                                    th:text="${spec.displayName}"
+                                    th:selected="${profile != null and profile.specialization == spec}">
+                            </option>
+                        </select>
+                        <button type="submit" class="btn btn-primary btn-sm">
+                            <i class="fas fa-save"></i>
+                            <span th:text="${profile == null} ? 'Назначить' : 'Обновить'"></span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Пустое состояние -->
+        <div th:if="${cooks.isEmpty()}" class="sched-empty sched-empty-fullrow">
+            <i class="fas fa-user-slash"></i>
+            <p>Нет сотрудников с ролью «Повар». Добавьте их в разделе «Персонал».</p>
+            <a th:href="@{/admin/employees}" class="btn btn-primary">
+                <i class="fas fa-users-cog"></i> Перейти к персоналу
+            </a>
+        </div>
+    </div>
+</div>
+</body>
+</html>

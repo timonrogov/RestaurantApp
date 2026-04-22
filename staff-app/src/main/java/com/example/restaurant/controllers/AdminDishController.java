@@ -106,4 +106,9 @@ public class AdminDishController {
         dishService.toggleAvailability(id);
         return "redirect:/admin/dishes";
     }
+
+    /*@GetMapping("/{dishId}/templates")
+    public String dishTemplates(@PathVariable Long dishId) {
+        return "redirect:/admin/dishes/" + dishId + "/templates";
+    }*/
 }

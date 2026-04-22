@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+    <title>Планировщик | Бобр и Точка!</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" th:href="@{/css/common.css}">
+    <link rel="stylesheet" th:href="@{/css/admin-scheduler.css}">
+    <meta th:name="_csrf"        th:content="${_csrf.token}"/>
+    <meta th:name="_csrf_header" th:content="${_csrf.headerName}"/>
+</head>
+<body>
+<div th:replace="fragments/header :: header"></div>
+
+<div class="main-container">
+
+    <div class="sched-page-header">
+        <div>
+            <h1><i class="fas fa-project-diagram"></i> Планировщик кухни</h1>
+            <p class="sched-subtitle">Сводная картина текущего состояния приготовления</p>
+        </div>
+        <div class="sched-header-links">
+            <a th:href="@{/admin/cooks}"     class="btn btn-secondary"><i class="fas fa-user-cog"></i> Повара</a>
+            <a th:href="@{/admin/equipment}" class="btn btn-secondary"><i class="fas fa-blender"></i> Оборудование</a>
+        </div>
+    </div>
+
+    <div th:if="${success}" class="sched-alert sched-alert-success">
+        <i class="fas fa-check-circle"></i> <span th:text="${success}"></span>
+    </div>
+
+    <!-- === Сводные плитки === -->
+    <div class="sched-stat-row">
+        <div class="sched-stat-tile">
+            <div class="sched-stat-icon" style="color: var(--color3)"><i class="fas fa-fire-alt"></i></div>
+            <div class="sched-stat-value" th:text="${activeTasks.size()}">0</div>
+            <div class="sched-stat-label">Активных задач</div>
+        </div>
+        <div class="sched-stat-tile">
+            <div class="sched-stat-icon" style="color: var(--success)"><i class="fas fa-clipboard-list"></i></div>
+            <div class="sched-stat-value" th:text="${tasksByOrder.size()}">0</div>
+            <div class="sched-stat-label">Заказов в работе</div>
+        </div>
+        <div class="sched-stat-tile" th:classappend="${!overdueTasks.isEmpty()} ? ' sched-stat-danger'">
+            <div class="sched-stat-icon" style="color: var(--error)"><i class="fas fa-exclamation-triangle"></i></div>
+            <div class="sched-stat-value" th:text="${overdueTasks.size()}">0</div>
+            <div class="sched-stat-label">Просроченных</div>
+        </div>
+        <div class="sched-stat-tile">
+            <div class="sched-stat-icon" style="color: var(--color4)"><i class="fas fa-users"></i></div>
+            <div class="sched-stat-value" th:text="${activeCooks.size()}">0</div>
+            <div class="sched-stat-label">Поваров на смене</div>
+        </div>
+    </div>
+
+    <div class="sched-dashboard-grid">
+
+        <!-- === Левая колонка: Повара === -->
+        <div>
+            <div class="sched-card">
+                <div class="sched-card-header">
+                    <i class="fas fa-users"></i> Повара на смене
+                </div>
+
+                <div th:if="${activeCooks.isEmpty()}" class="sched-empty">
+                    <i class="fas fa-user-slash"></i><p>Нет активных поваров</p>
+                </div>
+
+                <div th:each="cook : ${activeCooks}" class="sched-cook-row">
+                    <div class="sched-cook-avatar">
+                        <i class="fas fa-user-circle"></i>
+                    </div>
+                    <div class="sched-cook-info">
+                        <div class="sched-cook-nm" th:text="${cook.employee.fullName}">Иванов</div>
+                        <div class="sched-cook-sp">
+                            <span class="sched-spec-badge" th:text="${cook.specialization.displayName}">Цех</span>
+                            <span class="sched-task-count">
+                                <i class="fas fa-tasks"></i>
+                                <strong th:text="${taskCountByCook.get(cook.id) ?: 0}">0</strong> задач
+                            </span>
+                        </div>
+                    </div>
+                    <form th:action="@{/admin/scheduler/cook/{id}/unavailable(id=${cook.id})}" method="post">
+                        <button type="submit" class="btn btn-sm btn-danger"
+                                title="Пометить недоступным"
+                                onclick="return confirm('Повар уйдёт, задачи будут перепланированы?')">
+                            <i class="fas fa-user-times"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Оборудование -->
+            <div class="sched-card" style="margin-top: 20px">
+                <div class="sched-card-header">
+                    <i class="fas fa-blender"></i> Оборудование
+                </div>
+                <!-- ИСПРАВЛЕНИЕ: меняем eq на equipItem -->
+                <div th:each="equipItem : ${equipment}" class="sched-cook-row"
+                     th:classappend="${!equipItem.active} ? ' sched-row-inactive'">
+                    <div class="sched-cook-avatar" style="font-size: 1.1rem; color: var(--color3)">
+                        <i class="fas fa-blender"></i>
+                    </div>
+                    <div class="sched-cook-info">
+                        <div class="sched-cook-nm" th:text="${equipItem.name}">Духовка</div>
+                        <div class="sched-cook-sp">
+                            <span class="sched-equip-type" th:text="${equipItem.equipmentType}">OVEN</span>
+                            <span th:if="${equipItem.active}"  class="sched-status-active"><i class="fas fa-circle"></i> Работает</span>
+                            <span th:unless="${equipItem.active}" class="sched-status-inactive"><i class="fas fa-circle"></i> Сломано</span>
+                        </div>
+                    </div>
+                    <form th:if="${equipItem.active}"
+                          th:action="@{/admin/scheduler/equipment/{id}/broken(id=${equipItem.id})}" method="post">
+                        <button type="submit" class="btn btn-sm btn-danger"
+                                title="Сломалось"
+                                onclick="return confirm('Пометить оборудование как неисправное?')">
+                            <i class="fas fa-tools"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- === Правая колонка: Задачи по заказам === -->
+        <div>
+            <div class="sched-card">
+                <div class="sched-card-header">
+                    <i class="fas fa-stream"></i> Задачи по заказам
+                </div>
+
+                <div th:if="${activeTasks.isEmpty()}" class="sched-empty">
+                    <i class="fas fa-clipboard-check"></i>
+                    <p>Нет активных задач. Ждём новых заказов.</p>
+                </div>
+
+                <div th:each="entry : ${tasksByOrder}" class="sched-order-block">
+                    <div class="sched-order-title">
+                        <span class="id-label">ЗАКАЗ</span>
+                        <span class="id-value">#<span th:text="${entry.key}"></span></span>
+                        <span class="sched-order-table"
+                              th:text="'Стол ' + ${entry.value[0].orderItem.order.tableNumber}"></span>
+                    </div>
+
+                    <div th:each="task : ${entry.value}" class="sched-task-row"
+                         th:classappend="${task.status.name() == 'IN_PROGRESS'} ? ' sched-task-active'">
+
+                        <div class="sched-task-step">
+                            <span th:text="${task.template.stepNumber}">1</span>
+                        </div>
+                        <div class="sched-task-info">
+                            <div class="sched-task-dish" th:text="${task.orderItem.dish.name}">Блюдо</div>
+                            <div class="sched-task-step-name" th:text="${task.template.stepName}">Этап</div>
+                        </div>
+                        <div class="sched-task-right">
+                            <div th:if="${task.assignedCook != null}"
+                                 class="sched-task-cook"
+                                 th:text="${task.assignedCook.employee.fullName}">Повар</div>
+                            <div th:unless="${task.assignedCook != null}" class="sched-task-cook sched-unassigned">
+                                Не назначен
+                            </div>
+                            <div th:if="${task.plannedEndTime != null}" class="sched-task-time"
+                                 th:classappend="${task.plannedEndTime.isBefore(T(java.time.LocalDateTime).now())} ? ' sched-overdue'">
+                                <i class="fas fa-clock"></i>
+                                <span th:text="${#temporals.format(task.plannedEndTime, 'HH:mm')}">14:30</span>
+                            </div>
+                            <span class="sched-task-status"
+                                  th:classappend="'sched-status-' + ${task.status.name().toLowerCase()}"
+                                  th:text="${task.status.displayName}">статус</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+</body>
+</html>

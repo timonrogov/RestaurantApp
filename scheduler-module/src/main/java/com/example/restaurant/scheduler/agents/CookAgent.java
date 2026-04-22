@@ -35,7 +35,7 @@ import java.util.List;
  */
 public class CookAgent extends BaseAgent {
 
-    private final CookProfile cookProfile;
+    private CookProfile cookProfile;
     private final CookSchedule schedule;
 
     /** Флаг доступности. SceneAgent проверяет его перед включением в список кандидатов. */
@@ -437,7 +437,7 @@ public class CookAgent extends BaseAgent {
     }
 
     // -----------------------------------------------------------------------
-    // Геттеры
+    // Геттеры и сеттеры
     // -----------------------------------------------------------------------
 
     public long getCookId() {
@@ -462,5 +462,10 @@ public class CookAgent extends BaseAgent {
 
     public CookProfile getCookProfile() {
         return cookProfile;
+    }
+
+    public void setCookProfile(CookProfile cookProfile) {
+        this.cookProfile = cookProfile;
+        this.active = cookProfile.isActive();
     }
 }

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+    <title>Оборудование | Бобр и Точка!</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" th:href="@{/css/common.css}">
+    <link rel="stylesheet" th:href="@{/css/admin-scheduler.css}">
+    <meta th:name="_csrf"        th:content="${_csrf.token}"/>
+    <meta th:name="_csrf_header" th:content="${_csrf.headerName}"/>
+</head>
+<body>
+<div th:replace="fragments/header :: header"></div>
+
+<div class="main-container">
+    <div class="sched-page-header">
+        <div>
+            <h1><i class="fas fa-blender"></i> Кухонное оборудование</h1>
+            <p class="sched-subtitle">Управление единицами оборудования и их доступностью для планировщика</p>
+        </div>
+    </div>
+
+    <div th:if="${success}" class="sched-alert sched-alert-success">
+        <i class="fas fa-check-circle"></i> <span th:text="${success}"></span>
+    </div>
+
+    <div class="sched-two-col">
+
+        <!-- Список оборудования -->
+        <div class="sched-card">
+            <div class="sched-card-header">
+                <i class="fas fa-list"></i> Всё оборудование
+                <span class="sched-count" th:text="${equipmentList.size()}">0</span>
+            </div>
+
+            <div th:if="${equipmentList.isEmpty()}" class="sched-empty">
+                <i class="fas fa-blender"></i>
+                <p>Оборудование не добавлено</p>
+            </div>
+
+            <div class="sched-equip-list">
+                <div th:each="equipItem : ${equipmentList}"
+                     class="sched-equip-row"
+                     th:classappend="${!equipItem.active} ? ' sched-row-inactive'">
+
+                    <div class="sched-equip-icon">
+                        <i class="fas fa-blender"></i>
+                    </div>
+                    <div class="sched-equip-info">
+                        <div class="sched-equip-name" th:text="${equipItem.name}">Духовка</div>
+                        <div class="sched-equip-meta">
+                            <span class="sched-equip-type" th:text="${equipItem.equipmentType}">OVEN</span>
+                            <span><i class="fas fa-layer-group"></i> <strong th:text="${equipItem.maxParallelTasks}">2</strong> одновременно</span>
+                        </div>
+                    </div>
+                    <div class="sched-equip-actions">
+                        <form th:action="@{/admin/equipment/{id}/toggle(id=${equipItem.id})}" method="post">
+                            <button type="submit"
+                                    th:class="${equipItem.active} ? 'btn btn-sm btn-warning' : 'btn btn-sm btn-success'"
+                                    th:title="${equipItem.active} ? 'Пометить как сломанное' : 'Пометить как исправное'">
+                                <i th:class="${equipItem.active} ? 'fas fa-tools' : 'fas fa-check'"></i>
+                                <span th:text="${equipItem.active} ? 'Сломано' : 'Починено'"></span>
+                            </button>
+                        </form>
+                        <form th:action="@{/admin/equipment/{id}/delete(id=${equipItem.id})}" method="post">
+                            <button type="submit" class="btn btn-sm btn-danger"
+                                    onclick="return confirm('Удалить оборудование?')">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Форма добавления -->
+        <div class="sched-card">
+            <div class="sched-card-header">
+                <i class="fas fa-plus"></i> Добавить оборудование
+            </div>
+            <form th:action="@{/admin/equipment}" method="post" class="sched-form">
+
+                <div class="sched-form-group">
+                    <label>Название</label>
+                    <input type="text" name="name" placeholder="Духовой шкаф Unox №2" required>
+                </div>
+
+                <div class="sched-form-row">
+                    <div class="sched-form-group">
+                        <label>Тип (код)</label>
+                        <select name="equipmentType" required>
+                            <option value="OVEN">OVEN — Духовка</option>
+                            <option value="GRILL">GRILL — Гриль</option>
+                            <option value="FRYER">FRYER — Фритюрница</option>
+                            <option value="STOVE">STOVE — Плита</option>
+                            <option value="STEAMER">STEAMER — Пароварка</option>
+                        </select>
+                    </div>
+                    <div class="sched-form-group">
+                        <label>Параллельных задач</label>
+                        <input type="number" name="maxParallelTasks" min="1" value="2" required>
+                    </div>
+                </div>
+
+                <div class="sched-hint">
+                    <i class="fas fa-info-circle"></i>
+                    «Параллельных задач» — сколько блюд одновременно помещается в это оборудование.
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width:100%">
+                    <i class="fas fa-plus"></i> Добавить
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+</body>
+</html>

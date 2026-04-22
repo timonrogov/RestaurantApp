@@ -26,6 +26,13 @@
                         <span>Заказы</span>
                     </a>
 
+                    <a th:href="@{/kds}"
+                       sec:authorize="hasAnyRole('COOK', 'ADMIN')"
+                       class="nav-item-link">
+                        <i class="fas fa-utensils"></i>
+                        <span>KDS</span>
+                    </a>
+
                     <a th:href="@{/admin/calls}"
                        sec:authorize="hasAnyRole('WAITER', 'ADMIN')"
                        class="nav-item-link call-nav-link">

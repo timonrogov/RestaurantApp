@@ -37,11 +37,10 @@ public interface CookingTaskRepository extends JpaRepository<CookingTask, Long> 
     List<CookingTask> findByStatus(CookingTaskStatus status);
 
     /**
-     * Получить задачи, назначенные на конкретное оборудование, с заданным статусом.
-     * EquipmentAgent использует при перепланировании из-за поломки.
+     * Получить задачи, назначенные на конкретный тип оборудования, с заданным статусом.
      */
-    List<CookingTask> findByAssignedEquipmentIdAndStatus(
-            Long equipmentId,
+    List<CookingTask> findByAssignedEquipmentTypeAndStatus(
+            String equipmentType,
             CookingTaskStatus status
     );
 
@@ -56,4 +55,18 @@ public interface CookingTaskRepository extends JpaRepository<CookingTask, Long> 
             @Param("orderId") Long orderId,
             @Param("courseNumber") int courseNumber
     );
+
+    /**
+     * Найти ID заказов со статусом COOKING, у которых ещё нет ни одной задачи.
+     * Используется планировщиком для обнаружения новых заказов из customer-app.
+     */
+    @Query("""
+                SELECT o.id FROM Order o
+                WHERE o.status = 'COOKING'
+                AND NOT EXISTS (
+                    SELECT 1 FROM CookingTask ct
+                    WHERE ct.orderItem.order.id = o.id
+                )
+            """)
+    List<Long> findCookingOrderIdsWithoutTasks();
 }

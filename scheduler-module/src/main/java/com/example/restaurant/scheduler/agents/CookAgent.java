@@ -134,7 +134,7 @@ public class CookAgent extends BaseAgent {
         // -------------------------------------------------------------------
         // Шаг 2: JIT-вариант
         // -------------------------------------------------------------------
-        LocalDateTime jitStart = schedule.findJitSlot(duration, deadline, notBefore);
+        LocalDateTime jitStart = schedule.findJitSlot(duration, request.getTargetEndTime(), notBefore);
 
         if (jitStart != null) {
             LocalDateTime jitEnd = jitStart.plusMinutes(duration);

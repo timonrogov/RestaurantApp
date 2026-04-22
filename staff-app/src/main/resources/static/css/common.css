@@ -28,6 +28,10 @@ body {
   right: 0;
 }
 
+*, *::before, *::after {
+  box-sizing: border-box; /* Важно! Padding не будет увеличивать ширину элементов */
+}
+
 h1, h2, h3, h4, h5, h6 {
   font-family: 'Playfair Display', serif;
   font-weight: 600;

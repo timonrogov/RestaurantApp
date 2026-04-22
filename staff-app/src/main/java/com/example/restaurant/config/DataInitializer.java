@@ -1,13 +1,9 @@
 package com.example.restaurant.config;
 
+import com.example.restaurant.enums.CookSpecialization;
 import com.example.restaurant.enums.Role;
-import com.example.restaurant.models.Day;
-import com.example.restaurant.models.Dish;
-import com.example.restaurant.models.DishCategory;
-import com.example.restaurant.repositories.AccountRepository;
-import com.example.restaurant.repositories.DayRepository;
-import com.example.restaurant.repositories.DishCategoryRepository;
-import com.example.restaurant.repositories.DishRepository;
+import com.example.restaurant.models.*;
+import com.example.restaurant.repositories.*;
 import com.example.restaurant.services.EmployeeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
@@ -28,17 +24,25 @@ public class DataInitializer implements CommandLineRunner {
     private final DayRepository dayRepository;
     private final DishRepository dishRepository;
 
+    // ДОБАВЛЕННЫЕ РЕПОЗИТОРИИ ДЛЯ ПЛАНИРОВЩИКА
+    private final EquipmentRepository equipmentRepository;
+    private final CookProfileRepository cookProfileRepository;
+    private final CookingTaskTemplateRepository templateRepository;
+
     @Autowired
     public DataInitializer(EmployeeService employeeService,
                            AccountRepository accountRepository,
                            DishCategoryRepository dishCategoryRepository,
                            DayRepository dayRepository,
-                           DishRepository dishRepository) {
+                           DishRepository dishRepository, EquipmentRepository equipmentRepository, CookProfileRepository cookProfileRepository, CookingTaskTemplateRepository templateRepository) {
         this.employeeService = employeeService;
         this.accountRepository = accountRepository;
         this.dishCategoryRepository = dishCategoryRepository;
         this.dayRepository = dayRepository;
         this.dishRepository = dishRepository;
+        this.equipmentRepository = equipmentRepository;
+        this.cookProfileRepository = cookProfileRepository;
+        this.templateRepository = templateRepository;
     }
 
     @Override
@@ -47,8 +51,11 @@ public class DataInitializer implements CommandLineRunner {
 
         initCategories();
         initEmployees();
+        initCookProfiles(); // <-- Создаем профили поварам
         initDays();
-        initDishes();
+        initEquipment();    // <-- Создаем оборудование
+        initDishes();       // (Блюда)
+        initTemplates();    // <-- Задаем тех. карты (шаблоны) блюдам
     }
 
     private void initCategories() {
@@ -369,5 +376,72 @@ public class DataInitializer implements CommandLineRunner {
         dish.setAvailable(true); // По умолчанию доступно
 
         dishRepository.save(dish);
+    }
+
+
+
+    private void initCookProfiles() {
+        if (cookProfileRepository.count() == 0) {
+            Employee cook = employeeService.getEmployeeByUsername("cook");
+            if (cook != null) {
+                CookProfile profile = new CookProfile();
+                profile.setEmployee(cook);
+                profile.setSpecialization(CookSpecialization.UNIVERSAL);
+                profile.setActive(true);
+                cookProfileRepository.save(profile);
+                System.out.println("Профиль повара (CookProfile) успешно создан.");
+            }
+        }
+    }
+
+    private void initEquipment() {
+        if (equipmentRepository.count() == 0) {
+            equipmentRepository.save(new Equipment(null, "Гриль Josper", "GRILL", 2, true));
+            equipmentRepository.save(new Equipment(null, "Духовой шкаф Unox", "OVEN", 4, true));
+            equipmentRepository.save(new Equipment(null, "Фритюрница", "FRYER", 2, true));
+            equipmentRepository.save(new Equipment(null, "Плита индукционная", "STOVE", 6, true));
+            System.out.println("Кухонное оборудование успешно создано.");
+        }
+    }
+
+    private void initTemplates() {
+        if (templateRepository.count() == 0) {
+            System.out.println("Начинаем заполнение шаблонов приготовления (техкарт)...");
+
+            // 1. Шаблоны для Стейка Рибай (многоэтапное приготовление с оборудованием)
+            dishRepository.findAll().stream()
+                    .filter(d -> d.getName().equals("Стейк Рибай Black Angus"))
+                    .findFirst()
+                    .ifPresent(steak -> {
+                        templateRepository.save(new CookingTaskTemplate(null, steak, 1, "Подготовка мяса", 3, CookSpecialization.HOT_SHOP, null, false));
+                        templateRepository.save(new CookingTaskTemplate(null, steak, 2, "Жарка на гриле", 12, CookSpecialization.GRILL, "GRILL", false));
+                        templateRepository.save(new CookingTaskTemplate(null, steak, 3, "Отдых мяса и подача", 5, CookSpecialization.HOT_SHOP, null, false));
+                    });
+
+            // 2. Шаблон для Цезаря (быстро, без оборудования)
+            dishRepository.findAll().stream()
+                    .filter(d -> d.getName().equals("Цезарь с тигровыми креветками"))
+                    .findFirst()
+                    .ifPresent(caesar -> {
+                        templateRepository.save(new CookingTaskTemplate(null, caesar, 1, "Нарезка и сборка", 8, CookSpecialization.COLD_SHOP, null, false));
+                    });
+
+            // 3. Шаблон для Картофеля по-деревенски
+            dishRepository.findAll().stream()
+                    .filter(d -> d.getName().equals("Картофель по-деревенски"))
+                    .findFirst()
+                    .ifPresent(potato -> {
+                        templateRepository.save(new CookingTaskTemplate(null, potato, 1, "Запекание", 15, CookSpecialization.HOT_SHOP, "OVEN", false));
+                    });
+
+            // Для простоты, всем остальным блюдам дадим базовый шаблон на 10 минут:
+            dishRepository.findAll().forEach(dish -> {
+                if (!templateRepository.existsByDishId(dish.getId())) {
+                    templateRepository.save(new CookingTaskTemplate(null, dish, 1, "Приготовление: " + dish.getName(), 10, CookSpecialization.UNIVERSAL, null, false));
+                }
+            });
+
+            System.out.println("Шаблоны приготовления успешно созданы.");
+        }
     }
 }

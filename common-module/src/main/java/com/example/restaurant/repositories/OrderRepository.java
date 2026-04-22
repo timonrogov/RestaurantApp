@@ -107,4 +107,16 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     // Ищет заказы, статус которых входит в переданный список (IN)
     List<Order> findByClientAndStatusIn(Client client, List<OrderStatus> statuses);
+
+    /**
+     * Загрузить заказ вместе со всеми OrderItem и их блюдами одним запросом.
+     * Используется планировщиком: агентам нужны эти данные вне Hibernate-сессии.
+     */
+    @Query("""
+                SELECT DISTINCT o FROM Order o
+                JOIN FETCH o.orderItems oi
+                JOIN FETCH oi.dish
+                WHERE o.id = :orderId
+            """)
+    Optional<Order> findByIdWithItems(@Param("orderId") Long orderId);
 }

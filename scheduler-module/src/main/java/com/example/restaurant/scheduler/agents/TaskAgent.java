@@ -54,6 +54,7 @@ public class TaskAgent extends BaseAgent {
     private final SceneAgent sceneAgent; // прямая ссылка для чтения расписаний
     private final CookingTaskRepository taskRepository;
     private final LocalDateTime notBefore;
+    private final LocalDateTime targetEndTime;
     private final LocalDateTime deadline;
 
     /** Нужно ли оборудование для этой задачи (кэшируем из template). */
@@ -103,6 +104,7 @@ public class TaskAgent extends BaseAgent {
                      SceneAgent sceneAgent,
                      CookingTaskRepository taskRepository,
                      LocalDateTime notBefore,
+                     LocalDateTime targetEndTime,
                      LocalDateTime deadline) {
         super("TASK_" + task.getId());
         this.task = task;
@@ -110,6 +112,7 @@ public class TaskAgent extends BaseAgent {
         this.sceneAgent = sceneAgent;
         this.taskRepository = taskRepository;
         this.notBefore = notBefore;
+        this.targetEndTime = targetEndTime;
         this.deadline = deadline;
         this.equipmentNeeded = task.getTemplate().getRequiredEquipmentType() != null;
     }
@@ -187,7 +190,8 @@ public class TaskAgent extends BaseAgent {
                 task.getTemplate().getRequiredSpecialization(),
                 notBefore,
                 deadline,
-                task.getOrderItem().getOrder().getId()
+                task.getOrderItem().getOrder().getId(),
+                targetEndTime
         );
 
         for (String cookAgentId : cookAgentIds) {
@@ -274,20 +278,21 @@ public class TaskAgent extends BaseAgent {
         long windowMinutes = SCORING_WINDOW_MINUTES;
 
         for (PlacementVariant variant : viable) {
-            double urgencyScore = computeUrgencyScore(variant.getEndTime(), windowMinutes);
+            // Оцениваем насколько точно мы попали в targetEndTime
+            double syncScore    = computeSyncScore(variant.getEndTime());
             double speedScore   = computeSpeedScore(variant.getStartTime(), windowMinutes);
             double loadScore    = computeLoadScore(variant.getResourceAgentId());
 
-            double total = 0.5 * urgencyScore + 0.3 * speedScore + 0.2 * loadScore; // Веса захардкожены
+            double total = 0.6 * syncScore + 0.2 * speedScore + 0.2 * loadScore; // Веса захардкожены
 
-            variant.setUrgencyScore(urgencyScore);
+            variant.setUrgencyScore(syncScore);
             variant.setSpeedScore(speedScore);
             variant.setLoadScore(loadScore);
             variant.setTotalScore(total);
 
             log.debug("{}: вариант {} повар {} → urgency={:.2f} speed={:.2f} load={:.2f} total={:.2f}",
                     agentId, variant.getVariantName(), variant.getResourceAgentId(),
-                    urgencyScore, speedScore, loadScore, total);
+                    syncScore, speedScore, loadScore, total);
         }
 
         // Сортировка: conflict-варианты уходят в конец
@@ -304,15 +309,14 @@ public class TaskAgent extends BaseAgent {
     }
 
     /**
-     * Оценка срочности: насколько задача заканчивается близко к дедлайну.
-     * 1.0 — заканчивается ровно в дедлайн (идеал для JIT).
-     * 0.0 — заканчивается сразу после notBefore (большой запас).
-     * Варианты позже дедлайна уже отфильтрованы выше.
+     * Оценка синхронизации: насколько точно задача заканчивается к targetEndTime.
+     * 1.0 — заканчивается идеально секунда в секунду.
+     * Чем больше отклонение в любую сторону, тем ближе к 0.0.
      */
-    private double computeUrgencyScore(LocalDateTime endTime, long windowMinutes) {
-        long minutesFromEnd = ChronoUnit.MINUTES.between(endTime, deadline);
-        if (minutesFromEnd < 0) return 0.0; // позже дедлайна (не должно случаться)
-        return Math.max(0.0, 1.0 - (double) minutesFromEnd / windowMinutes);
+    private double computeSyncScore(LocalDateTime endTime) {
+        long diffMinutes = Math.abs(ChronoUnit.MINUTES.between(endTime, targetEndTime));
+        // 60 минут — окно чувствительности. Если разница больше часа, оценка 0.
+        return Math.max(0.0, 1.0 - (double) diffMinutes / 60.0);
     }
 
     /**
@@ -387,7 +391,7 @@ public class TaskAgent extends BaseAgent {
         String equipmentType = task.getTemplate().getRequiredEquipmentType();
 
         // Узнать agentId агента оборудования через SceneAgent
-        send(SceneAgent.AGENT_ID, MessageType.GET_AVAILABLE_EQUIPMENT, equipmentType);
+        //send(SceneAgent.AGENT_ID, MessageType.GET_AVAILABLE_EQUIPMENT, equipmentType);
 
         // Мы ждём сначала AVAILABLE_EQUIPMENT_RESPONSE, потом пошлём EQUIPMENT_REQUEST.
         // Но это лишний round-trip. Проще: мы знаем ID агента оборудования напрямую.

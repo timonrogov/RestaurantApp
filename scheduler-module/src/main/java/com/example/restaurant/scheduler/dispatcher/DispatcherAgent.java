@@ -92,6 +92,7 @@ public class DispatcherAgent extends BaseAgent {
             case EQUIPMENT_BROKEN   -> handleEquipmentBroken(message);
             case EQUIPMENT_FIXED    -> handleEquipmentFixed(message);
             case ALL_TASKS_PLANNED  -> handleAllTasksPlanned(message);
+            case TASK_DONE_EVENT    -> handleTaskDone(message);
             default -> log.warn("{}: получено неожиданное сообщение типа {}",
                     agentId, message.getType());
         }
@@ -256,6 +257,30 @@ public class DispatcherAgent extends BaseAgent {
             messageBus.unregister(orderAgent.getAgentId());
             log.debug("{}: OrderAgent {} завершил работу и снят с регистрации",
                     agentId, orderAgent.getAgentId());
+        }
+    }
+
+    /**
+     * Задача фактически завершена поваром (нажата кнопка на KDS).
+     * Освобождаем временные слоты у повара и оборудования,
+     * чтобы они могли взять новые задачи досрочно.
+     */
+    private void handleTaskDone(Message message) {
+        long taskId = (Long) message.getBody();
+        log.info("{}: задача #{} выполнена фактически, освобождаем ресурсы в RAM", agentId, taskId);
+
+        // 1. Ищем и удаляем слот из расписания поваров
+        for (CookAgent cookAgent : cookAgents.values()) {
+            if (cookAgent.getSchedule().removeSlotByTaskId(taskId)) {
+                log.debug("{}: слот задачи #{} удален у повара {}", agentId, taskId, cookAgent.getAgentId());
+            }
+        }
+
+        // 2. Ищем и удаляем слот из расписания оборудования
+        for (EquipmentTypeAgent equipAgent : equipmentTypeAgents.values()) {
+            if (equipAgent.getSchedule().removeSlotByTaskId(taskId)) {
+                log.debug("{}: слот задачи #{} удален у оборудования {}", agentId, taskId, equipAgent.getAgentId());
+            }
         }
     }
 

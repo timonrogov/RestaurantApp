@@ -1,12 +1,14 @@
 package com.example.restaurant.services;
 
 import com.example.restaurant.enums.OrderStatus;
+import com.example.restaurant.events.OrderStatusChangedEvent;
 import com.example.restaurant.models.*;
 import com.example.restaurant.repositories.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +37,7 @@ public class OrderService {
     private final CartService cartService;
     private final OrderTimeSlotService orderTimeSlotService;
     private final PricingService pricingService;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * Конструктор для внедрения зависимостей через Spring
@@ -49,7 +52,8 @@ public class OrderService {
                         DishPromotionService dishPromotionService,
                         CartService cartService,
                         OrderTimeSlotService orderTimeSlotService,
-                        PricingService pricingService) {
+                        PricingService pricingService,
+                        ApplicationEventPublisher eventPublisher) {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.dishRepository = dishRepository;
@@ -60,6 +64,7 @@ public class OrderService {
         this.cartService = cartService;
         this.orderTimeSlotService = orderTimeSlotService;
         this.pricingService = pricingService;
+        this.eventPublisher = eventPublisher;
     }
 
 
@@ -190,6 +195,10 @@ public class OrderService {
 
         // 4. Сохраняем заказ
         orderRepository.save(cart);
+
+        eventPublisher.publishEvent(
+                new OrderStatusChangedEvent(this, cart.getId(), OrderStatus.COOKING, OrderStatus.ASSEMBLY)
+        );
     }
 
 
@@ -290,11 +299,15 @@ public class OrderService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("Order not found"));
 
-        // Превращаем String в Enum
+        OrderStatus previousStatus = order.getStatus(); // ← ДОБАВИТЬ эту строку
         OrderStatus newStatus = OrderStatus.valueOf(newStatusName);
         order.setStatus(newStatus);
-
         orderRepository.save(order);
+
+        // ← ДОБАВИТЬ публикацию события:
+        eventPublisher.publishEvent(
+                new OrderStatusChangedEvent(this, orderId, newStatus, previousStatus)
+        );
     }
 
 

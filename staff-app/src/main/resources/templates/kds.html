@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" th:href="@{/images/icon.png}" type="image/x-icon">
+    <title>KDS | Бобр и Точка!</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" th:href="@{/css/common.css}">
+    <link rel="stylesheet" th:href="@{/css/kds.css}">
+    <meta th:name="_csrf"        th:content="${_csrf.token}"/>
+    <meta th:name="_csrf_header" th:content="${_csrf.headerName}"/>
+</head>
+<body class="kds-page-body">
+
+<div th:replace="fragments/header :: header"></div>
+
+<!-- Верхняя полоска -->
+<div class="kds-topbar">
+    <div class="kds-cook-info">
+        <i class="fas fa-user-circle"></i>
+        <div>
+            <div class="kds-cook-name"  th:text="${cookName}">Иванов А.П.</div>
+            <div class="kds-cook-spec"  th:text="${specialization}">Горячий цех</div>
+        </div>
+    </div>
+
+    <div class="kds-counters">
+        <span class="kds-counter-badge planned">
+            <i class="fas fa-calendar-alt"></i>
+            Запланировано: <strong id="cnt-planned">0</strong>
+        </span>
+        <span class="kds-counter-badge in-progress">
+            <i class="fas fa-fire-alt"></i>
+            Готовится: <strong id="cnt-progress">0</strong>
+        </span>
+        <span class="kds-counter-badge done">
+            <i class="fas fa-check-circle"></i>
+            Готово: <strong id="cnt-done">0</strong>
+        </span>
+    </div>
+
+    <div class="kds-clock-block">
+        <span class="kds-time" id="kds-clock">--:--</span>
+        <button class="kds-refresh-btn" onclick="loadTasks()">
+            <i class="fas fa-sync-alt" id="refresh-icon"></i> Обновить
+        </button>
+    </div>
+</div>
+
+<!-- Три колонки -->
+<div class="kds-board">
+
+    <div class="kds-column">
+        <div class="kds-col-header planned-col">
+            <div class="kds-col-title">
+                <i class="fas fa-calendar-alt planned-icon"></i> Запланировано
+            </div>
+            <span class="kds-col-count" id="col-count-planned">0</span>
+        </div>
+        <div class="kds-col-body" id="col-planned">
+            <div class="kds-empty" id="empty-planned">
+                <i class="fas fa-calendar-check"></i>
+                <p>Нет запланированных задач</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="kds-column">
+        <div class="kds-col-header progress-col">
+            <div class="kds-col-title">
+                <i class="fas fa-fire-alt progress-icon"></i> Готовится
+            </div>
+            <span class="kds-col-count" id="col-count-progress">0</span>
+        </div>
+        <div class="kds-col-body" id="col-progress">
+            <div class="kds-empty" id="empty-progress">
+                <i class="fas fa-fire"></i>
+                <p>Нет активных задач</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="kds-column">
+        <div class="kds-col-header done-col">
+            <div class="kds-col-title">
+                <i class="fas fa-check-circle done-icon"></i> Готово
+            </div>
+            <span class="kds-col-count" id="col-count-done">0</span>
+        </div>
+        <div class="kds-col-body" id="col-done">
+            <div class="kds-empty" id="empty-done">
+                <i class="fas fa-check-double"></i>
+                <p>Выполненных задач пока нет</p>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Модальное окно задержки -->
+<div class="kds-modal-overlay" id="delay-modal">
+    <div class="kds-modal">
+        <div class="kds-modal-header">
+            <i class="fas fa-exclamation-triangle"></i>
+            <div>
+                <div class="kds-modal-title">Сообщить о задержке</div>
+                <div class="kds-modal-subtitle" id="modal-task-label">—</div>
+            </div>
+        </div>
+        <div class="kds-modal-body">
+            <label class="kds-modal-label">Задержка (минут)</label>
+            <div class="kds-delay-options">
+                <button class="kds-delay-option" data-minutes="5"  onclick="selectDelay(this)">+5 мин</button>
+                <button class="kds-delay-option" data-minutes="10" onclick="selectDelay(this)">+10 мин</button>
+                <button class="kds-delay-option" data-minutes="15" onclick="selectDelay(this)">+15 мин</button>
+                <button class="kds-delay-option" data-minutes="20" onclick="selectDelay(this)">+20 мин</button>
+            </div>
+            <label class="kds-modal-label">Причина (необязательно)</label>
+            <textarea id="delay-reason" placeholder="Нет ингредиента, ждём оборудование..."></textarea>
+        </div>
+        <div class="kds-modal-footer">
+            <button class="btn btn-secondary" onclick="closeDelayModal()">Отмена</button>
+            <button class="btn btn-primary"   onclick="submitDelay()">
+                <i class="fas fa-paper-plane"></i> Отправить
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="kds-toast" id="kds-toast"></div>
+
+<script th:inline="javascript">
+    const CSRF_TOKEN  = /*[[${_csrf.token}]]*/  '';
+    const CSRF_HEADER = /*[[${_csrf.headerName}]]*/ 'X-CSRF-TOKEN';
+
+    let currentDelayTaskId = null;
+    let selectedDelayMinutes = 10;
+
+    function loadTasks() {
+        const icon = document.getElementById('refresh-icon');
+        icon.style.transition = 'transform 0.5s ease';
+        icon.style.transform  = 'rotate(360deg)';
+        setTimeout(() => { icon.style.transform = ''; icon.style.transition = ''; }, 600);
+
+        fetch('/kds/api/tasks')
+            .then(r => r.json())
+            .then(tasks => renderBoard(tasks))
+            .catch(() => showToast('Ошибка обновления данных'));
+    }
+
+    function renderBoard(tasks) {
+        const planned  = tasks.filter(t => t.status === 'PLANNED');
+        const progress = tasks.filter(t => t.status === 'IN_PROGRESS');
+        const done     = tasks.filter(t => t.status === 'DONE');
+        document.getElementById('cnt-planned').textContent  = planned.length;
+        document.getElementById('cnt-progress').textContent = progress.length;
+        document.getElementById('cnt-done').textContent     = done.length;
+        renderColumn('col-planned',  'empty-planned',  'col-count-planned',  planned,  'planned');
+        renderColumn('col-progress', 'empty-progress', 'col-count-progress', progress, 'in_progress');
+        renderColumn('col-done',     'empty-done',     'col-count-done',     done,     'done');
+    }
+
+    function renderColumn(colId, emptyId, countId, tasks, type) {
+        const col = document.getElementById(colId);
+        document.getElementById(countId).textContent = tasks.length;
+        Array.from(col.children).forEach(c => { if (!c.classList.contains('kds-empty')) col.removeChild(c); });
+        document.getElementById(emptyId).style.display = tasks.length ? 'none' : 'block';
+        tasks.forEach(task => col.appendChild(buildCard(task, type)));
+    }
+
+    function buildCard(task, colType) {
+        const div = document.createElement('div');
+        const cls = ['kds-card'];
+        if (task.overdue) cls.push('is-overdue');
+        else if (task.urgent) cls.push('is-urgent');
+        if (task.status === 'DONE') cls.push('is-done');
+        div.className = cls.join(' ');
+
+        let badges = '';
+        if (task.overdue)           badges += `<span class="kds-badge overdue"><i class="fas fa-exclamation-circle"></i> Задержка</span>`;
+        else if (task.urgent)       badges += `<span class="kds-badge urgent"><i class="fas fa-bolt"></i> Срочно</span>`;
+        if (task.status === 'DONE') badges += `<span class="kds-badge done-badge"><i class="fas fa-check"></i> Готово</span>`;
+
+        const course = task.courseNumber > 1
+            ? `<span class="kds-course-badge">Курс ${task.courseNumber}</span>` : '';
+
+        const comment = task.clientComment
+            ? `<div class="kds-comment-block"><i class="fas fa-comment-alt"></i><span class="kds-comment-text">${esc(task.clientComment)}</span></div>` : '';
+
+        let timeRow = '';
+        if (task.plannedStartTime && task.plannedEndTime && task.status !== 'DONE') {
+            const ml = task.minutesLeft;
+            const cls2 = ml < 0 ? 'overdue' : (ml <= 5 ? 'urgent' : 'normal');
+            const txt  = ml < 0 ? `+${Math.abs(ml)} мин` : `${ml} мин`;
+            timeRow = `<div class="kds-time-row">
+                <span class="kds-time-range"><i class="fas fa-clock"></i>${task.plannedStartTime} → ${task.plannedEndTime}</span>
+                <span class="kds-minutes-left ${cls2}">${txt}</span>
+            </div>`;
+        }
+
+        let actions = '';
+        if (colType === 'planned') {
+            actions = `<div class="kds-card-actions">
+                <button class="btn btn-primary" onclick="startTask(${task.id})">
+                    <i class="fas fa-play"></i> Начать
+                </button></div>`;
+        } else if (colType === 'in_progress') {
+            actions = `<div class="kds-card-actions">
+                <button class="btn btn-success" onclick="doneTask(${task.id})">
+                    <i class="fas fa-check"></i> Готово
+                </button>
+                <button class="btn-delay" onclick="openDelayModal(${task.id}, '${esc(task.dishName)} — ${esc(task.stepName)}')">
+                    <i class="fas fa-exclamation-triangle"></i> Задержка
+                </button></div>`;
+        }
+
+        div.innerHTML = `
+            <div class="kds-card-header">
+                <div class="kds-order-info">
+                    <span class="kds-order-num">#${task.orderId}</span>
+                    <span class="kds-table-badge"><i class="fas fa-chair"></i> ${esc(task.tableNumber)}</span>
+                    ${course}
+                </div>
+                <div class="kds-status-badges">${badges}</div>
+            </div>
+            <div class="kds-card-body">
+                <div class="kds-dish-name">${esc(task.dishName)}</div>
+                <div class="kds-step-name"><i class="fas fa-utensils"></i> ${esc(task.stepName)}</div>
+                ${comment}${timeRow}
+            </div>${actions}`;
+        return div;
+    }
+
+    function startTask(id) {
+        postAction(`/kds/api/tasks/${id}/start`, {})
+            .then(() => { showToast('Задача начата'); loadTasks(); });
+    }
+    function doneTask(id) {
+        postAction(`/kds/api/tasks/${id}/done`, {})
+            .then(() => { showToast('Задача выполнена!'); loadTasks(); });
+    }
+
+    function openDelayModal(id, label) {
+        currentDelayTaskId = id;
+        selectedDelayMinutes = 10;
+        document.getElementById('modal-task-label').textContent = label;
+        document.getElementById('delay-reason').value = '';
+        document.querySelectorAll('.kds-delay-option').forEach(b =>
+            b.classList.toggle('selected', parseInt(b.dataset.minutes) === 10));
+        document.getElementById('delay-modal').classList.add('active');
+    }
+    function closeDelayModal() {
+        document.getElementById('delay-modal').classList.remove('active');
+        currentDelayTaskId = null;
+    }
+    function selectDelay(btn) {
+        selectedDelayMinutes = parseInt(btn.dataset.minutes);
+        document.querySelectorAll('.kds-delay-option').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+    }
+    function submitDelay() {
+        if (!currentDelayTaskId) return;
+        const reason = document.getElementById('delay-reason').value.trim();
+        const params = new URLSearchParams({ delayMinutes: selectedDelayMinutes });
+        if (reason) params.append('reason', reason);
+        postAction(`/kds/api/tasks/${currentDelayTaskId}/delay?${params}`, {})
+            .then(() => { closeDelayModal(); showToast(`Задержка +${selectedDelayMinutes} мин отправлена`); loadTasks(); });
+    }
+    document.getElementById('delay-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeDelayModal(); });
+
+    function postAction(url, body) {
+        const h = { 'Content-Type': 'application/json' };
+        h[CSRF_HEADER] = CSRF_TOKEN;
+        return fetch(url, { method: 'POST', headers: h, body: JSON.stringify(body) })
+            .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+            .catch(() => showToast('Ошибка выполнения действия'));
+    }
+    function showToast(msg) {
+        const t = document.getElementById('kds-toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 3000);
+    }
+    function esc(s) {
+        if (!s) return '';
+        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+    }
+    function updateClock() {
+        const n = new Date();
+        document.getElementById('kds-clock').textContent =
+            String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0');
+    }
+
+    loadTasks();
+    updateClock();
+    setInterval(loadTasks,   15000);
+    setInterval(updateClock, 10000);
+</script>
+
+</body>
+</html>

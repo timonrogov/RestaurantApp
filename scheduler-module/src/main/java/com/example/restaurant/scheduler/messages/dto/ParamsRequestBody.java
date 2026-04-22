@@ -44,18 +44,22 @@ public class ParamsRequestBody {
      */
     private final long orderIdForConflictCheck;
 
+    private final LocalDateTime targetEndTime;
+
     public ParamsRequestBody(long taskId,
                              int durationMinutes,
                              CookSpecialization requiredSpecialization,
                              LocalDateTime notBefore,
                              LocalDateTime deadline,
-                             long orderIdForConflictCheck) {
+                             long orderIdForConflictCheck,
+                             LocalDateTime targetEndTime) {
         this.taskId = taskId;
         this.durationMinutes = durationMinutes;
         this.requiredSpecialization = requiredSpecialization;
         this.notBefore = notBefore;
         this.deadline = deadline;
         this.orderIdForConflictCheck = orderIdForConflictCheck;
+        this.targetEndTime = targetEndTime;
     }
 
     public long getTaskId() { return taskId; }
@@ -64,4 +68,5 @@ public class ParamsRequestBody {
     public LocalDateTime getNotBefore() { return notBefore; }
     public LocalDateTime getDeadline() { return deadline; }
     public long getOrderIdForConflictCheck() { return orderIdForConflictCheck; }
+    public LocalDateTime getTargetEndTime() { return targetEndTime; }
 }

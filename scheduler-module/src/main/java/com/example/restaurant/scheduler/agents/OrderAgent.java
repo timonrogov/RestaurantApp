@@ -262,6 +262,17 @@ public class OrderAgent extends BaseAgent {
                 .filter(t -> current.taskIds.contains(t.getId()))
                 .toList();
 
+        // === ИСПРАВЛЕНИЕ: ВЫЧИСЛЯЕМ УМНЫЙ ДЕДЛАЙН (targetEndTime) ===
+        int maxDuration = tasks.stream()
+                .mapToInt(t -> t.getTemplate().getDurationMinutes())
+                .max()
+                .orElse(0);
+
+        // Целевое время синхронизации — это время окончания самого долгого блюда
+        LocalDateTime targetEndTime = notBefore.plusMinutes(maxDuration);
+        log.debug("{}: курс {}, notBefore={}, targetEndTime={}, deadline={}",
+                agentId, current.courseNumber, notBefore, targetEndTime, deadline);
+
         for (CookingTask task : tasks) {
             TaskAgent taskAgent = new TaskAgent(
                     task,
@@ -269,6 +280,7 @@ public class OrderAgent extends BaseAgent {
                     sceneAgent,
                     taskRepository,
                     notBefore,
+                    targetEndTime,
                     deadline
             );
 

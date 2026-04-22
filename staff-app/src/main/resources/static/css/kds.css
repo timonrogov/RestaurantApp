@@ -1,0 +1,217 @@
+/* kds.css — стили KDS. Использует только переменные из common.css */
+
+/* 1. Макет */
+.kds-page-body {
+    display: flex;
+    flex-direction: column;
+    height: 100vh; /* <-- Заменили тут */
+    overflow: hidden;
+    background-color: var(--color1);
+    box-sizing: border-box;
+}
+
+/* 2. Верхняя инфо-полоска */
+.kds-topbar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 30px;
+    background-color: var(--color0);
+    border-bottom: 2px solid var(--color2);
+    gap: 20px;
+}
+.kds-cook-info { display: flex; align-items: center; gap: 12px; }
+.kds-cook-info i { font-size: 1.8rem; color: var(--color3); }
+.kds-cook-name { font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 700; color: var(--color5); line-height: 1.2; }
+.kds-cook-spec { font-size: 0.78rem; color: var(--color3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+
+.kds-counters { display: flex; gap: 8px; }
+.kds-counter-badge {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 14px; border-radius: 20px; font-size: 0.82rem; font-weight: 600; border: 1px solid transparent;
+}
+.kds-counter-badge.planned  { background: var(--color1); border-color: var(--color2); color: var(--color4); }
+.kds-counter-badge.in-progress { background: rgba(159,87,39,.1); border-color: var(--color3); color: var(--color3); }
+.kds-counter-badge.done     { background: rgba(40,167,69,.1); border-color: var(--success); color: var(--success); }
+
+.kds-clock-block { display: flex; align-items: center; gap: 16px; }
+.kds-time { font-family: 'Playfair Display', serif; font-size: 1.5rem; font-weight: 700; color: var(--color4); letter-spacing: 1px; }
+.kds-refresh-btn {
+    background: var(--color0); border: 1px solid var(--color3); color: var(--color3);
+    padding: 7px 16px; border-radius: 20px; cursor: pointer;
+    font-family: 'Lato', sans-serif; font-size: 0.85rem; font-weight: 600;
+    display: flex; align-items: center; gap: 7px; transition: all 0.3s ease;
+}
+.kds-refresh-btn:hover { background: var(--color3); color: var(--color0); }
+.kds-refresh-btn i { transition: transform 0.5s ease; }
+.kds-refresh-btn:hover i { transform: rotate(180deg); }
+
+/* 3. Три колонки */
+.kds-board {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    overflow: hidden;
+    border-top: 1px solid var(--color2);
+    min-height: 0; /* <-- ДОБАВИЛИ ЭТУ СТРОКУ */
+}
+.kds-column {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-right: 1px solid var(--color2);
+    min-height: 0; /* <-- ДОБАВИЛИ ЭТУ СТРОКУ */
+}
+.kds-column:last-child { border-right: none; }
+
+.kds-col-header {
+    flex-shrink: 0;
+    padding: 14px 20px;
+    background-color: var(--color0);
+    border-bottom: 3px solid transparent;
+    display: flex; align-items: center; justify-content: space-between;
+}
+.kds-col-header.planned-col  { border-bottom-color: var(--color2); }
+.kds-col-header.progress-col { border-bottom-color: var(--color3); }
+.kds-col-header.done-col     { border-bottom-color: var(--success); }
+
+.kds-col-title { display: flex; align-items: center; gap: 10px; font-size: 0.82rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--color5); }
+.kds-col-title i.planned-icon  { color: var(--color2); }
+.kds-col-title i.progress-icon { color: var(--color3); }
+.kds-col-title i.done-icon     { color: var(--success); }
+
+.kds-col-count { font-size: 0.78rem; font-weight: 700; padding: 3px 10px; border-radius: 10px; }
+.planned-col  .kds-col-count { background: var(--color1); color: var(--color4); }
+.progress-col .kds-col-count { background: rgba(159,87,39,.12); color: var(--color3); }
+.done-col     .kds-col-count { background: rgba(40,167,69,.12); color: var(--success); }
+
+.kds-col-body {
+    flex: 1; overflow-y: auto; padding: 14px 12px; background-color: var(--color1);
+    scrollbar-width: thin; scrollbar-color: var(--color2) transparent;
+}
+.kds-col-body::-webkit-scrollbar       { width: 4px; }
+.kds-col-body::-webkit-scrollbar-thumb { background: var(--color2); border-radius: 2px; }
+
+.kds-empty { text-align: center; padding: 3rem 1rem; color: var(--color2); }
+.kds-empty i { font-size: 2.5rem; margin-bottom: 0.8rem; display: block; }
+.kds-empty p { font-size: 0.85rem; margin: 0; }
+
+/* 4. Карточка задачи */
+.kds-card {
+    background: var(--color0); border-radius: var(--border-radius);
+    border: 1px solid var(--color2); margin-bottom: 10px; overflow: hidden;
+    transition: box-shadow 0.25s ease, transform 0.25s ease;
+    animation: kds-slide-in 0.2s ease;
+}
+@keyframes kds-slide-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.kds-card:hover { box-shadow: 0 6px 18px rgba(104,50,4,.1); transform: translateY(-2px); }
+.kds-card.is-overdue { border-color: var(--error); animation: kds-pulse-danger 2s infinite; }
+@keyframes kds-pulse-danger {
+    0%,100% { box-shadow: 0 0 0 0 rgba(220,53,69,0); }
+    50%     { box-shadow: 0 0 0 4px rgba(220,53,69,.15); }
+}
+.kds-card.is-urgent { border-color: var(--color3); }
+.kds-card.is-done { opacity: 0.65; }
+
+.kds-card-header {
+    padding: 10px 14px; background-color: var(--color1); border-bottom: 1px solid var(--color2);
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.kds-order-info { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.kds-order-num { font-family: 'Playfair Display', serif; font-size: 1.05rem; font-weight: 700; color: var(--color5); }
+.kds-table-badge { font-size: 0.72rem; font-weight: 700; padding: 2px 9px; border-radius: 5px; background: var(--color2); color: var(--color4); text-transform: uppercase; letter-spacing: .3px; }
+.kds-course-badge { font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 5px; background: rgba(159,87,39,.12); color: var(--color3); border: 1px solid rgba(159,87,39,.3); text-transform: uppercase; letter-spacing: .3px; }
+.kds-status-badges { display: flex; gap: 5px; flex-shrink: 0; }
+.kds-badge { font-size: 0.65rem; font-weight: 800; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: .5px; }
+.kds-badge.overdue  { background: rgba(220,53,69,.12); color: var(--error); border: 1px solid rgba(220,53,69,.3); animation: badge-blink 1.5s infinite; }
+@keyframes badge-blink { 0%,100% { opacity: 1; } 50% { opacity: .5; } }
+.kds-badge.urgent   { background: rgba(159,87,39,.1); color: var(--color3); border: 1px solid var(--color2); }
+.kds-badge.done-badge { background: rgba(40,167,69,.1); color: var(--success); border: 1px solid rgba(40,167,69,.3); }
+
+.kds-card-body { padding: 12px 14px; }
+.kds-dish-name { font-family: 'Playfair Display', serif; font-size: 1rem; font-weight: 700; color: var(--color5); line-height: 1.3; margin-bottom: 3px; }
+.kds-step-name { font-size: 0.8rem; color: var(--color3); font-weight: 600; margin-bottom: 10px; }
+
+.kds-comment-block {
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 8px 10px; background: var(--color1); border-radius: var(--border-radius);
+    border-left: 3px solid var(--color3); margin-bottom: 10px;
+}
+.kds-comment-block i { color: var(--color3); font-size: .85rem; flex-shrink: 0; margin-top: 2px; }
+.kds-comment-text { font-size: .82rem; color: var(--color4); font-style: italic; line-height: 1.4; }
+
+.kds-time-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-top: 8px; border-top: 1px dashed var(--color2); }
+.kds-time-range { font-size: .78rem; color: var(--color4); font-weight: 600; display: flex; align-items: center; gap: 5px; }
+.kds-time-range i { color: var(--color2); }
+.kds-minutes-left { font-size: .8rem; font-weight: 700; padding: 2px 10px; border-radius: 10px; }
+.kds-minutes-left.normal  { background: rgba(40,167,69,.1); color: var(--success); }
+.kds-minutes-left.urgent  { background: rgba(159,87,39,.12); color: var(--color3); }
+.kds-minutes-left.overdue { background: rgba(220,53,69,.12); color: var(--error); }
+
+.kds-card-actions {
+    display: flex; gap: 6px; padding: 10px 14px;
+    border-top: 1px solid var(--color2); background-color: var(--color0);
+}
+.kds-card-actions .btn { flex: 1; padding: 7px 10px !important; font-size: .82rem !important; justify-content: center; }
+.kds-card-actions .btn-delay {
+    flex: 0 0 auto; padding: 7px 12px !important;
+    background: transparent; border: 1px solid var(--error); color: var(--error);
+    border-radius: var(--border-radius); cursor: pointer;
+    font-family: 'Lato', sans-serif; font-size: .82rem; font-weight: 600;
+    display: flex; align-items: center; gap: 5px; transition: all 0.3s ease;
+}
+.kds-card-actions .btn-delay:hover { background: var(--error); color: white; }
+
+/* 5. Модальное окно */
+.kds-modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(72,40,19,.45); backdrop-filter: blur(3px);
+    z-index: 1000; align-items: center; justify-content: center;
+}
+.kds-modal-overlay.active { display: flex; animation: modal-fade-in .2s ease; }
+@keyframes modal-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.kds-modal {
+    background: var(--color0); border-radius: 16px; border: 1px solid var(--color2);
+    width: 100%; max-width: 420px; margin: 0 20px;
+    box-shadow: 0 20px 60px rgba(104,50,4,.2);
+    animation: modal-slide-up .25s ease;
+}
+@keyframes modal-slide-up { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.kds-modal-header { padding: 18px 22px 14px; border-bottom: 1px solid var(--color2); display: flex; align-items: center; gap: 12px; }
+.kds-modal-header i { font-size: 1.3rem; color: var(--color3); }
+.kds-modal-title { font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 700; color: var(--color5); line-height: 1.2; }
+.kds-modal-subtitle { font-size: .8rem; color: var(--color3); margin-top: 2px; }
+.kds-modal-body { padding: 18px 22px; }
+.kds-modal-label { font-size: .82rem; font-weight: 600; color: var(--color4); margin-bottom: 8px; display: block; }
+.kds-delay-options { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 16px; }
+.kds-delay-option {
+    padding: 10px 5px; border-radius: var(--border-radius); border: 2px solid var(--color2);
+    background: transparent; color: var(--color5); font-family: 'Lato', sans-serif;
+    font-size: .9rem; font-weight: 700; cursor: pointer; text-align: center; transition: all .2s ease;
+}
+.kds-delay-option:hover { border-color: var(--color3); color: var(--color3); background: rgba(159,87,39,.06); }
+.kds-delay-option.selected { background: var(--color3); border-color: var(--color3); color: var(--color0); }
+.kds-modal-body textarea { width: 100%; height: 70px; resize: none; margin-bottom: 0; }
+.kds-modal-footer { padding: 14px 22px 18px; display: flex; gap: 10px; border-top: 1px solid var(--color2); }
+.kds-modal-footer .btn { flex: 1; }
+
+/* 6. Toast */
+.kds-toast {
+    position: fixed; bottom: 30px; left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--color4); color: var(--color0);
+    padding: 12px 28px; border-radius: 25px; font-size: .9rem; font-weight: 600;
+    box-shadow: 0 8px 24px rgba(104,50,4,.25);
+    transition: transform .3s ease, opacity .3s ease;
+    opacity: 0; z-index: 2000; white-space: nowrap;
+}
+.kds-toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+/* 7. Адаптивность */
+@media (max-width: 900px) {
+    .kds-board { grid-template-columns: 1fr; overflow-y: auto; }
+    .kds-column { min-height: 300px; border-right: none; border-bottom: 1px solid var(--color2); }
+    .kds-topbar { flex-wrap: wrap; }
+    .kds-counters { flex-wrap: wrap; }
+}

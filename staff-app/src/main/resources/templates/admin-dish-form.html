@@ -81,6 +81,37 @@
                         </select>
                     </div>
 
+                    <!-- Курс подачи -->
+                    <div class="form-group">
+                        <label>
+                            Курс подачи
+                            <span class="help-text" title="Определяет порядок подачи блюда. Планировщик учитывает курсы при составлении расписания кухни.">
+                                <i class="fas fa-question-circle" style="color: var(--color3); cursor: help;"></i>
+                            </span>
+                        </label>
+                        <select th:field="*{defaultCourse}" required>
+                            <option value="1" th:selected="*{defaultCourse} == 1">
+                                1 — Аперитив / Напитки (подаются сразу)
+                            </option>
+                            <option value="2" th:selected="*{defaultCourse} == 2">
+                                2 — Закуска / Салаты
+                            </option>
+                            <option value="3" th:selected="*{defaultCourse} == 3">
+                                3 — Первое блюдо (супы)
+                            </option>
+                            <option value="4" th:selected="*{defaultCourse} == 4">
+                                4 — Основное блюдо (горячее)
+                            </option>
+                            <option value="5" th:selected="*{defaultCourse} == 5">
+                                5 — Десерт
+                            </option>
+                        </select>
+                        <p class="help-text" style="margin-top: 4px; font-size: 0.8rem; color: var(--color5);">
+                            <i class="fas fa-info-circle"></i>
+                            Это значение по умолчанию. Планировщик будет готовить это блюдо в рамках выбранной подачи.
+                        </p>
+                    </div>
+
                     <!-- Цена и Вес (в одну строку) -->
                     <div class="form-row">
                         <div class="form-group">

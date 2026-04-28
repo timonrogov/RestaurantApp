@@ -38,6 +38,7 @@ public class OrderService {
     private final OrderTimeSlotService orderTimeSlotService;
     private final PricingService pricingService;
     private final ApplicationEventPublisher eventPublisher;
+    private final OrderCourseRepository orderCourseRepository;
 
     /**
      * Конструктор для внедрения зависимостей через Spring
@@ -53,7 +54,8 @@ public class OrderService {
                         CartService cartService,
                         OrderTimeSlotService orderTimeSlotService,
                         PricingService pricingService,
-                        ApplicationEventPublisher eventPublisher) {
+                        ApplicationEventPublisher eventPublisher,
+                        OrderCourseRepository orderCourseRepository) {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.dishRepository = dishRepository;
@@ -65,6 +67,7 @@ public class OrderService {
         this.orderTimeSlotService = orderTimeSlotService;
         this.pricingService = pricingService;
         this.eventPublisher = eventPublisher;
+        this.orderCourseRepository = orderCourseRepository;
     }
 
 
@@ -173,7 +176,9 @@ public class OrderService {
 
 
     @Transactional
-    public void confirmOrder(Principal principal, String tableNumber, HttpServletRequest request, HttpServletResponse response) {
+    public void confirmOrder(Principal principal, String tableNumber,
+                             HttpServletRequest request, HttpServletResponse response) {
+
         // 1. Получаем корзину
         Order cart = cartService.getCurrentCart(principal, request, response);
 
@@ -181,24 +186,101 @@ public class OrderService {
             throw new RuntimeException("Невозможно подтвердить пустой заказ.");
         }
 
-        // 2. Создаем и СОХРАНЯЕМ слот
+        // 2. Создаём и сохраняем временной слот
         OrderTimeSlot timeSlot = orderTimeSlotService.createCurrentOrderTimeSlot();
-        timeSlot = orderTimeSlotRepository.save(timeSlot); // <--- ОЧЕНЬ ВАЖНО: Сохраняем явно!
+        timeSlot = orderTimeSlotRepository.save(timeSlot);
 
-        // 3. Обновляем поля
+        // 3. Обновляем поля заказа
         cart.setTimeSlot(timeSlot);
-        cart.setTableNumber(tableNumber); // <--- Проверьте, что эта строка есть!
+        cart.setTableNumber(tableNumber);
         cart.setStatus(OrderStatus.COOKING);
 
         double totalWithDiscount = pricingService.calculateTotalWithDiscount(cart);
         cart.setTotalPrice(totalWithDiscount);
 
-        // 4. Сохраняем заказ
+        // 4. ═══════════════════════════════════════════════════════
+        //    НОВАЯ ЛОГИКА: Проставляем курс каждому OrderItem
+        //    из defaultCourse блюда
+        // ═══════════════════════════════════════════════════════════
+        cart.getOrderItems().forEach(item -> {
+            int course = item.getDish().getDefaultCourse();
+            item.setCourseNumber(course);
+        });
+
+        // 5. Сохраняем заказ (items сохраняются каскадно)
         orderRepository.save(cart);
 
+        // 6. ═══════════════════════════════════════════════════════
+        //    НОВАЯ ЛОГИКА: Создаём OrderCourse записи для каждого
+        //    уникального курса, встреченного в заказе
+        // ═══════════════════════════════════════════════════════════
+        rebuildOrderCourses(cart);
+
+        // 7. Публикуем событие изменения статуса
         eventPublisher.publishEvent(
                 new OrderStatusChangedEvent(this, cart.getId(), OrderStatus.COOKING, OrderStatus.ASSEMBLY)
         );
+    }
+
+    /**
+     * Пересоздаёт записи OrderCourse для заказа на основе курсов его позиций.
+     *
+     * Метод:
+     *  1. Удаляет старые записи (идемпотентность — можно вызвать повторно)
+     *  2. Находит уникальные номера курсов среди OrderItem заказа
+     *  3. Для каждого курса создаёт OrderCourse с нужным syncGapMinutes
+     *
+     * Если в заказе только блюда одного курса (например, только основные) —
+     * создаётся одна запись с courseNumber=тот_курс и syncGapMinutes=0,
+     * так как нет предыдущего курса для синхронизации.
+     */
+    private void rebuildOrderCourses(Order order) {
+        // Удаляем старые (для идемпотентности)
+        orderCourseRepository.deleteByOrderId(order.getId());
+
+        // Собираем уникальные номера курсов, сортируем по возрастанию
+        List<Integer> courseNumbers = order.getOrderItems().stream()
+                .map(item -> item.getDish().getDefaultCourse())
+                .distinct()
+                .sorted()
+                .toList();
+
+        for (int i = 0; i < courseNumbers.size(); i++) {
+            int courseNumber = courseNumbers.get(i);
+
+            OrderCourse course = new OrderCourse();
+            course.setOrder(order);
+            course.setCourseNumber(courseNumber);
+
+            // Первый курс в ЭТОМ заказе всегда начинается без паузы.
+            // Последующие получают стандартную паузу по своему номеру.
+            if (i == 0) {
+                course.setSyncGapMinutes(0);
+            } else {
+                course.setSyncGapMinutes(defaultSyncGap(courseNumber));
+            }
+
+            orderCourseRepository.save(course);
+        }
+    }
+
+    /**
+     * Стандартная пауза (в минутах) перед началом готовки курса N,
+     * отсчитываемая от момента готовности предыдущего курса.
+     *
+     * Значения основаны на реальной ресторанной практике:
+     * пауза нужна, чтобы гости успели съесть предыдущую подачу
+     * прежде, чем принесут следующую.
+     */
+    private int defaultSyncGap(int courseNumber) {
+        return switch (courseNumber) {
+            case 1 -> 0;   // Аперитив — сразу
+            case 2 -> 5;   // Закуска — через 5 мин
+            case 3 -> 10;  // Первое — через 10 мин
+            case 4 -> 15;  // Основное — через 15 мин
+            case 5 -> 20;  // Десерт — через 20 мин
+            default -> 10; // Нестандартный курс — разумный дефолт
+        };
     }
 
 

@@ -44,6 +44,26 @@ public class Dish {
     @Column(name = "is_available", nullable = false) // Доступность блюда для заказа
     private boolean isAvailable = true; // По умолчанию доступно
 
+    /**
+     * Курс подачи блюда по умолчанию.
+     * Определяет, в рамках какой подачи блюдо попадёт в заказ.
+     *
+     * Стандартная шкала:
+     *   1 — Аперитив / Напитки  (подаются сразу, без паузы)
+     *   2 — Закуска / Салаты    (через ~5 мин после напитков)
+     *   3 — Первое блюдо (суп)  (через ~10 мин после закусок)
+     *   4 — Основное блюдо      (через ~15 мин после первого)
+     *   5 — Десерт              (через ~20 мин после основного)
+     *
+     * Администратор может изменить курс конкретного блюда
+     * независимо от курса, принятого по умолчанию для его категории.
+     *
+     * columnDefinition гарантирует, что при ALTER TABLE существующие
+     * строки получат значение 1, а не вызовут ошибку NOT NULL.
+     */
+    @Column(name = "default_course", nullable = false, columnDefinition = "integer default 1")
+    private int defaultCourse = 1;
+
     // Связь с акциями: каскадное обновление/удаление
     @OneToMany(mappedBy = "dish", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<DishPromotion> promotions = new ArrayList<>();

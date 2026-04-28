@@ -20,4 +20,10 @@ public interface OrderCourseRepository extends JpaRepository<OrderCourse, Long> 
      * Найти конкретный курс заказа по его номеру.
      */
     Optional<OrderCourse> findByOrderIdAndCourseNumber(Long orderId, int courseNumber);
+
+    /**
+     * Удалить все курсы заказа — используется при пересоздании курсов
+     * в confirmOrder() для идемпотентности операции.
+     */
+    void deleteByOrderId(Long orderId);  // ← НОВЫЙ МЕТОД
 }

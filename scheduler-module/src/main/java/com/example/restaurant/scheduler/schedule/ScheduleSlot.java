@@ -87,6 +87,22 @@ public class ScheduleSlot {
         return startTime.isBefore(to) && from.isBefore(endTime);
     }
 
+    /**
+     * Сдвинуть начало слота. Вызывается при автоматическом сдвиге расписания.
+     * @param newStartTime новое время начала
+     */
+    public void setStartTime(LocalDateTime newStartTime) {
+        this.startTime = newStartTime;
+    }
+
+    /**
+     * Сдвинуть конец слота. Вызывается при автоматическом сдвиге расписания.
+     * @param newEndTime новое время окончания
+     */
+    public void setEndTime(LocalDateTime newEndTime) {
+        this.endTime = newEndTime;
+    }
+
     @Override
     public String toString() {
         return "ScheduleSlot{taskId=" + taskId +

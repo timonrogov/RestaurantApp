@@ -84,11 +84,26 @@ public class CookingTask {
     private LocalDateTime plannedStartTime;
 
     /**
+     * Изначально запланированное время начала.
+     * Фиксируется один раз при самом первом переводе в статус PLANNED.
+     * Служит эталоном (baseline) для вычисления общих задержек по задаче.
+     */
+    @Column(name = "initial_planned_start_time")
+    private LocalDateTime initialPlannedStartTime;
+
+    /**
      * Плановое время окончания выполнения задачи.
      * Вычисляется планировщиком, null до планирования.
      */
     @Column(name = "planned_end_time")
     private LocalDateTime plannedEndTime;
+
+    /**
+     * Изначально запланированное время окончания.
+     * Служит эталоном для вычисления задержек в процессе выполнения (IN_PROGRESS).
+     */
+    @Column(name = "initial_planned_end_time")
+    private LocalDateTime initialPlannedEndTime;
 
     /**
      * Фактическое время начала.

@@ -7,66 +7,91 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
 public interface CookingTaskRepository extends JpaRepository<CookingTask, Long> {
 
-    /**
-     * Получить все задачи заказа.
-     * OrderAgent использует этот метод для отслеживания общего прогресса.
-     */
     @Query("SELECT t FROM CookingTask t WHERE t.orderItem.order.id = :orderId")
     List<CookingTask> findByOrderId(@Param("orderId") Long orderId);
 
-    /**
-     * Получить задачи конкретного повара в заданных статусах.
-     * KDS-контроллер вызывает этот метод для отображения задач на экране.
-     *
-     * Пример вызова: findByAssignedCookIdAndStatusIn(cookId, List.of(PLANNED, IN_PROGRESS))
-     */
     List<CookingTask> findByAssignedCookIdAndStatusIn(
-            Long cookId,
-            List<CookingTaskStatus> statuses
-    );
+            Long cookId, List<CookingTaskStatus> statuses);
 
-    /**
-     * Получить все задачи с заданным статусом.
-     * Используется администратором для сводного экрана планировщика.
-     */
     List<CookingTask> findByStatus(CookingTaskStatus status);
 
-    /**
-     * Получить задачи, назначенные на конкретный тип оборудования, с заданным статусом.
-     */
-    List<CookingTask> findByAssignedEquipmentTypeAndStatus(
-            String equipmentType,
-            CookingTaskStatus status
-    );
+    List<CookingTask> findByStatusIn(List<CookingTaskStatus> statuses);
 
-    /**
-     * Получить задачи заказа для конкретного курса.
-     * OrderAgent вызывает при контроле завершения курса.
-     */
+    List<CookingTask> findByAssignedEquipmentTypeAndStatus(
+            String equipmentType, CookingTaskStatus status);
+
     @Query("SELECT t FROM CookingTask t " +
             "WHERE t.orderItem.order.id = :orderId " +
             "AND t.orderItem.courseNumber = :courseNumber")
     List<CookingTask> findByOrderIdAndCourseNumber(
             @Param("orderId") Long orderId,
-            @Param("courseNumber") int courseNumber
-    );
+            @Param("courseNumber") int courseNumber);
+
+    @Query("""
+        SELECT o.id FROM Order o
+        WHERE o.status = 'COOKING'
+        AND NOT EXISTS (
+            SELECT 1 FROM CookingTask ct
+            WHERE ct.orderItem.order.id = o.id
+        )
+    """)
+    List<Long> findCookingOrderIdsWithoutTasks();
 
     /**
-     * Найти ID заказов со статусом COOKING, у которых ещё нет ни одной задачи.
-     * Используется планировщиком для обнаружения новых заказов из customer-app.
+     * Задачи IN_PROGRESS, у которых плановое время окончания уже прошло.
+     * Используется для автоматического обнаружения задержек выполнения.
      */
-    @Query("""
-                SELECT o.id FROM Order o
-                WHERE o.status = 'COOKING'
-                AND NOT EXISTS (
-                    SELECT 1 FROM CookingTask ct
-                    WHERE ct.orderItem.order.id = o.id
-                )
-            """)
-    List<Long> findCookingOrderIdsWithoutTasks();
+    @Query("SELECT t FROM CookingTask t " +
+            "WHERE t.status = com.example.restaurant.enums.CookingTaskStatus.IN_PROGRESS " +
+            "AND t.plannedEndTime IS NOT NULL " +
+            "AND t.plannedEndTime < :now")
+    List<CookingTask> findOverdueInProgressTasks(@Param("now") LocalDateTime now);
+
+    /**
+     * Задачи PLANNED, у которых плановое время начала уже прошло.
+     * Используется для автоматического обнаружения задержек начала.
+     */
+    @Query("SELECT t FROM CookingTask t " +
+            "WHERE t.status = com.example.restaurant.enums.CookingTaskStatus.PLANNED " +
+            "AND t.plannedStartTime IS NOT NULL " +
+            "AND t.plannedStartTime < :now")
+    List<CookingTask> findOverduePlannedTasks(@Param("now") LocalDateTime now);
+
+    /**
+     * PLANNED-задачи повара, начинающиеся строго позже указанного времени.
+     * Используется для сдвига последующих задач при задержке.
+     */
+    List<CookingTask> findByAssignedCookIdAndStatusAndPlannedStartTimeGreaterThanEqual(
+            Long cookId, CookingTaskStatus status, LocalDateTime time);
+
+    /**
+     * PLANNED-задачи заказа в курсах строго позже указанного.
+     * Используется для сдвига следующих курсов при задержке.
+     */
+    @Query("SELECT t FROM CookingTask t " +
+            "WHERE t.orderItem.order.id = :orderId " +
+            "AND t.orderItem.courseNumber > :courseNumber " +
+            "AND t.status = com.example.restaurant.enums.CookingTaskStatus.PLANNED")
+    List<CookingTask> findNextCourseTasks(
+            @Param("orderId") Long orderId,
+            @Param("courseNumber") int courseNumber);
+
+    /**
+     * Число задач заказа, ещё не завершённых.
+     * Если результат == 0 — все задачи выполнены, можно переводить заказ в READY.
+     */
+    @Query("SELECT COUNT(t) FROM CookingTask t " +
+            "WHERE t.orderItem.order.id = :orderId " +
+            "AND t.status NOT IN (" +
+            "  com.example.restaurant.enums.CookingTaskStatus.DONE, " +
+            "  com.example.restaurant.enums.CookingTaskStatus.FAILED, " +
+            "  com.example.restaurant.enums.CookingTaskStatus.CANCELLED" +
+            ")")
+    long countUnfinishedTasksByOrderId(@Param("orderId") Long orderId);
 }

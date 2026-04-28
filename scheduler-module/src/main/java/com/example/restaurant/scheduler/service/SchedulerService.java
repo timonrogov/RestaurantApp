@@ -16,6 +16,7 @@ import com.example.restaurant.scheduler.dispatcher.MessageBus;
 import com.example.restaurant.scheduler.messages.Message;
 import com.example.restaurant.scheduler.messages.MessageType;
 import com.example.restaurant.scheduler.messages.dto.TaskDelayBody;
+import com.example.restaurant.services.OrderService;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -24,8 +25,11 @@ import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.example.restaurant.events.CookingTaskUpdatedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
 
@@ -50,12 +54,21 @@ public class SchedulerService {
 
     private static final Logger log = LoggerFactory.getLogger(SchedulerService.class);
 
+    /**
+     * Если повар закончил задачу раньше чем на это количество минут — считаем
+     * это значимым досрочным завершением и сдвигаем последующие задачи назад.
+     * Значение 5 даёт небольшой буфер: мелкое расхождение не вызывает лишних сдвигов.
+     */
+    private static final int EARLY_FINISH_THRESHOLD_MINUTES = 5;
+
     private final DispatcherAgent dispatcher;
     private final MessageBus messageBus;
     private final CookProfileRepository cookProfileRepository;
     private final EquipmentRepository equipmentRepository;
     private final CookingTaskRepository cookingTaskRepository;
     private final OrderRepository orderRepository;
+    private final OrderService orderService;
+    private final ApplicationEventPublisher eventPublisher;
 
     // -----------------------------------------------------------------------
     // Инициализация при старте
@@ -73,13 +86,15 @@ public class SchedulerService {
     public void init() {
         log.info("SchedulerService: инициализация мультиагентной системы...");
 
-        List<CookProfile> activeCooks = cookProfileRepository.findByIsActiveTrue();
-        List<Equipment> activeEquipment = equipmentRepository.findByIsActiveTrue();
+        // ИСПРАВЛЕНИЕ: Грузим ВСЕХ поваров и ВСЁ оборудование.
+        // Неактивные агенты создадутся, но будут спать.
+        List<CookProfile> allCooks = cookProfileRepository.findAll();
+        List<Equipment> allEquipment = equipmentRepository.findAll();
 
-        dispatcher.initialize(activeCooks, activeEquipment);
+        dispatcher.initialize(allCooks, allEquipment);
 
         log.info("SchedulerService: система готова. Поваров: {}, единиц оборудования: {}.",
-                activeCooks.size(), activeEquipment.size());
+                allCooks.size(), allEquipment.size());
     }
 
     // -----------------------------------------------------------------------
@@ -220,47 +235,72 @@ public class SchedulerService {
         task.setStatus(CookingTaskStatus.IN_PROGRESS);
         task.setActualStartTime(LocalDateTime.now());
         cookingTaskRepository.save(task);
+        eventPublisher.publishEvent(new CookingTaskUpdatedEvent(this, task.getAssignedCook().getId()));
         log.debug("SchedulerService: задача #{} → IN_PROGRESS", taskId);
     }
 
     /**
      * Повар нажал «Готово» на KDS.
-     * Переводит задачу в DONE и фиксирует actualEndTime.
-     * Отправляет TASK_DONE_EVENT — OrderAgent может пересчитать notBefore
-     * следующего курса если фактическое время сильно отличается от планового.
      *
-     * @param taskId ID задачи CookingTask
+     * Логика:
+     *   1. Перевести задачу в DONE, зафиксировать actualEndTime.
+     *   2. Освободить ресурсы (через TASK_DONE_EVENT).
+     *   3. Если повар закончил значительно раньше плана — сдвинуть последующие
+     *      задачи на более раннее время (через TASK_DELAY_EVENT с отрицательным числом).
+     *   4. Проверить: все ли задачи заказа выполнены? Если да — перевести заказ в READY.
      */
     @Transactional
     public void markTaskDone(Long taskId) {
         CookingTask task = getTaskOrThrow(taskId);
-        task.setStatus(CookingTaskStatus.DONE);
-        task.setActualEndTime(LocalDateTime.now());
-        cookingTaskRepository.save(task);
-        log.info("SchedulerService: задача #{} → DONE (фактически в {})",
-                taskId, task.getActualEndTime());
+        LocalDateTime actualEnd = LocalDateTime.now();
 
+        task.setStatus(CookingTaskStatus.DONE);
+        task.setActualEndTime(actualEnd);
+        cookingTaskRepository.save(task);
+
+        log.info("SchedulerService: задача #{} → DONE (фактически в {})", taskId, actualEnd);
+
+        // Шаг 2: освободить ресурсы
         dispatchAndProcess(MessageType.TASK_DONE_EVENT, taskId);
+
+        // Шаг 3: если закончил значительно раньше — сдвинуть следующие задачи
+        if (task.getPlannedEndTime() != null) {
+            long earlyMinutes = ChronoUnit.MINUTES.between(actualEnd, task.getPlannedEndTime());
+            if (earlyMinutes > EARLY_FINISH_THRESHOLD_MINUTES) {
+                log.info("SchedulerService: задача #{} завершена на {} мин раньше — " +
+                        "сдвигаем последующие задачи", taskId, earlyMinutes);
+                // Отрицательное значение = сдвиг назад
+                TaskDelayBody earlyBody = new TaskDelayBody(taskId, (int) -earlyMinutes, null);
+                dispatchAndProcess(MessageType.TASK_DELAY_EVENT, earlyBody);
+            }
+        }
+
+        // Шаг 4: проверить завершённость заказа
+        Long orderId = task.getOrderItem().getOrder().getId();
+        checkAndMarkOrderReady(orderId);
+        eventPublisher.publishEvent(new CookingTaskUpdatedEvent(this, null)); // null = затронуты все повара
     }
 
     /**
-     * Повар сообщил о задержке через KDS.
-     * Сохраняет причину и уведомляет OrderAgent для пересчёта зависимых задач.
-     *
-     * @param taskId       ID задачи CookingTask
-     * @param delayMinutes на сколько минут задерживается
-     * @param reason       причина (может быть null)
+     * Повар сообщил о задержке через KDS (ручное сообщение).
+     * Сохраняет причину в БД и запускает сдвиг расписания.
      */
     @Transactional
     public void reportDelay(Long taskId, int delayMinutes, String reason) {
         CookingTask task = getTaskOrThrow(taskId);
-        task.setDelayReason(reason);
+        if (reason != null && !reason.isBlank()) {
+            task.setDelayReason(reason);
+        }
+        if (task.getPlannedEndTime() != null) {
+            task.setPlannedEndTime(task.getPlannedEndTime().plusMinutes(delayMinutes));
+        }
         cookingTaskRepository.save(task);
         log.info("SchedulerService: задача #{} задерживается на {} мин. Причина: {}",
                 taskId, delayMinutes, reason);
 
         TaskDelayBody body = new TaskDelayBody(taskId, delayMinutes, reason);
         dispatchAndProcess(MessageType.TASK_DELAY_EVENT, body);
+        eventPublisher.publishEvent(new CookingTaskUpdatedEvent(this, null));
     }
 
     // -----------------------------------------------------------------------
@@ -300,6 +340,80 @@ public class SchedulerService {
         List<CookingTask> inProgress = cookingTaskRepository.findByStatus(CookingTaskStatus.IN_PROGRESS);
 
         return java.util.stream.Stream.concat(inProgress.stream(), planned.stream()).toList();
+    }
+
+    /**
+     * Автоматическое обнаружение задержек — каждую минуту.
+     *
+     * Проверяет два вида задержек:
+     *   1. Задачи IN_PROGRESS с просроченным plannedEndTime — повар не нажал «Готово»
+     *   2. Задачи PLANNED с просроченным plannedStartTime — повар не нажал «Начать»
+     *
+     * Для каждой такой задачи отправляет TASK_DELAY_EVENT на 1 минуту.
+     * Это сдвигает все последующие задачи этого повара и следующие курсы заказа.
+     *
+     * fixedDelay = 60_000: следующий запуск через 60 сек ПОСЛЕ окончания предыдущего,
+     * что гарантирует точность в 1 минуту без наложений.
+     */
+    @Scheduled(fixedDelay = 60_000)
+    @Transactional
+    public void detectAndReportDelays() {
+        LocalDateTime now = LocalDateTime.now();
+        boolean hasChanges = false; // <-- 1. Флаг для отслеживания изменений
+
+        // 1. Задержки выполнения: IN_PROGRESS с просроченным endTime
+        List<CookingTask> overdueExecution = cookingTaskRepository.findOverdueInProgressTasks(now);
+        if (!overdueExecution.isEmpty()) {
+            log.info("SchedulerService: {} задач задерживают выполнение, вычисляем сдвиг", overdueExecution.size());
+
+            for (CookingTask task : overdueExecution) {
+                try {
+                    LocalDateTime oldEndTime = task.getPlannedEndTime();
+                    int delayMinutes = (int) ChronoUnit.MINUTES.between(oldEndTime, now.plusMinutes(1));
+                    if (delayMinutes <= 0) delayMinutes = 1;
+
+                    task.setPlannedEndTime(oldEndTime.plusMinutes(delayMinutes));
+                    cookingTaskRepository.save(task);
+
+                    TaskDelayBody body = new TaskDelayBody(task.getId(), delayMinutes, "auto: задача просрочена на " + delayMinutes + " мин.");
+                    dispatchAndProcess(MessageType.TASK_DELAY_EVENT, body);
+
+                    hasChanges = true; // <-- 2. Фиксируем изменение
+                } catch (Exception e) {
+                    log.error("SchedulerService: ошибка при обработке задержки задачи #{}: {}", task.getId(), e.getMessage(), e);
+                }
+            }
+        }
+
+        // 2. Задержки начала: PLANNED с просроченным startTime
+        List<CookingTask> overdueStart = cookingTaskRepository.findOverduePlannedTasks(now);
+        if (!overdueStart.isEmpty()) {
+            log.info("SchedulerService: {} задач задерживают начало, вычисляем сдвиг", overdueStart.size());
+
+            for (CookingTask task : overdueStart) {
+                try {
+                    LocalDateTime oldStartTime = task.getPlannedStartTime();
+                    int delayMinutes = (int) ChronoUnit.MINUTES.between(oldStartTime, now.plusMinutes(1));
+                    if (delayMinutes <= 0) delayMinutes = 1;
+
+                    task.setPlannedStartTime(oldStartTime.plusMinutes(delayMinutes));
+                    task.setPlannedEndTime(task.getPlannedEndTime().plusMinutes(delayMinutes));
+                    cookingTaskRepository.save(task);
+
+                    TaskDelayBody body = new TaskDelayBody(task.getId(), delayMinutes, "auto: начало просрочено на " + delayMinutes + " мин.");
+                    dispatchAndProcess(MessageType.TASK_DELAY_EVENT, body);
+
+                    hasChanges = true; // <-- 3. Фиксируем изменение
+                } catch (Exception e) {
+                    log.error("SchedulerService: ошибка при обработке задержки начала задачи #{}: {}", task.getId(), e.getMessage(), e);
+                }
+            }
+        }
+
+        // <-- 4. ЕСЛИ БЫЛИ СДВИГИ - ПУБЛИКУЕМ СОБЫТИЕ ДЛЯ WEBSOCKET -->
+        if (hasChanges) {
+            eventPublisher.publishEvent(new CookingTaskUpdatedEvent(this, null));
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -346,6 +460,24 @@ public class SchedulerService {
                     log.error("SchedulerService: ошибка планирования заказа #{}: {}", orderId, e.getMessage(), e);
                 }
             }
+        }
+    }
+
+    /**
+     * Проверить: все ли задачи заказа завершены?
+     * Если да — перевести заказ из COOKING в READY.
+     *
+     * Вызывается после каждого нажатия «Готово» на KDS.
+     */
+    private void checkAndMarkOrderReady(Long orderId) {
+        long unfinished = cookingTaskRepository.countUnfinishedTasksByOrderId(orderId);
+        if (unfinished == 0) {
+            orderRepository.findById(orderId).ifPresent(order -> {
+                if (order.getStatus() == OrderStatus.COOKING) {
+                    orderService.changeOrderStatus(orderId, "READY");
+                    log.info("SchedulerService: заказ #{} → READY (все задачи выполнены)", orderId);
+                }
+            });
         }
     }
 }

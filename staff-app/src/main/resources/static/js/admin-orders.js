@@ -44,3 +44,56 @@ function filterOrdersByTable() {
         }
     });
 }
+
+// ============================================================
+// Добавить в конец admin-orders.js
+// ============================================================
+
+/**
+ * WebSocket-подписка для страницы управления заказами.
+ * При изменении статуса заказа — обновляем бейдж на карточке.
+ */
+function connectOrdersWebSocket() {
+    function subscribe(client) {
+        client.subscribe('/topic/orders', function (message) {
+            const data = JSON.parse(message.body);
+            updateOrderCard(data.orderId, data.status, data.statusDisplay);
+        });
+    }
+
+    if (window.stompClient && window.stompClient.connected) {
+        subscribe(window.stompClient);
+        return;
+    }
+
+    const socket = new SockJS('/ws');
+    const client = Stomp.over(socket);
+    client.debug = null;
+    client.connect({}, function () { subscribe(client); },
+                       function () { setTimeout(connectOrdersWebSocket, 5000); });
+}
+
+/**
+ * Обновить статусный бейдж на карточке заказа без перезагрузки страницы.
+ */
+function updateOrderCard(orderId, status, statusDisplay) {
+    const card = document.querySelector(`.admin-order-card[data-order-id="${orderId}"]`);
+    if (!card) return; // Карточка не на этой странице (другой фильтр активен)
+
+    // Обновляем бейдж статуса
+    const badge = card.querySelector('.status-badge');
+    if (badge) {
+        // Убираем все старые классы статуса
+        badge.className = badge.className.replace(/\bstatus-\S+/g, '').trim();
+        badge.classList.add('status-badge', 'status-' + status.toLowerCase());
+        badge.textContent = statusDisplay;
+    }
+
+    // Визуальная вспышка для привлечения внимания
+    card.classList.add('card-updated');
+    setTimeout(() => card.classList.remove('card-updated'), 1500);
+}
+
+$(document).ready(function () {
+    connectOrdersWebSocket();
+});

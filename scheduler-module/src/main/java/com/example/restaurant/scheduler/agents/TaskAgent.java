@@ -572,6 +572,10 @@ public class TaskAgent extends BaseAgent {
         task.setStatus(CookingTaskStatus.PLANNED);
         task.setPlannedStartTime(confirmedStart);
         task.setPlannedEndTime(confirmedEnd);
+        if (task.getInitialPlannedStartTime() == null) {
+            task.setInitialPlannedStartTime(confirmedStart);
+            task.setInitialPlannedEndTime(confirmedEnd);
+        }
 
         // assignedCook: находим CookProfile через sceneAgent
         CookSchedule cookSchedule = sceneAgent.getCookSchedule(cookId);

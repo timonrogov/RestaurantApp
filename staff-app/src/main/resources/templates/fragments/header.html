@@ -101,6 +101,15 @@
         </div>
     </div>
 
-    <!-- Глобальный скрипт уведомлений -->
+    <!-- 1. СНАЧАЛА ГРУЗИМ JQUERY И TOASTR -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+
+    <!-- 2. ЗАТЕМ ГЛОБАЛЬНЫЙ СКРИПТ УВЕДОМЛЕНИЙ -->
     <script sec:authorize="hasAnyRole('WAITER', 'ADMIN')" th:src="@{/js/staff-notifications.js}"></script>
+
+    <!-- 3. ЗАТЕМ WEBSOCKET БИБЛИОТЕКИ -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
 </header>

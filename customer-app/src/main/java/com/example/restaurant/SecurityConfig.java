@@ -27,7 +27,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**")) // CSRF для API можно оставить, если API используется клиентом
+                .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**", "/ws/**"))
                 .authorizeHttpRequests(auth -> auth
                         // Разрешаем доступ ко всем статическим ресурсам и страницам регистрации/логина
                         .requestMatchers(
@@ -37,7 +37,8 @@ public class SecurityConfig {
                                 "/orders/view",
                                 "/orders/remove-item/**",
                                 "/orders/confirm",
-                                "/api/calls/**"
+                                "/api/calls/**",
+                                "/ws/**"
                         ).permitAll()
                         // Все остальные запросы (например, /account, /orders/history) требуют аутентификации
                         .anyRequest().authenticated()

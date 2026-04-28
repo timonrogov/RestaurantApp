@@ -75,3 +75,43 @@ setInterval(updateTimeAgo, 60000);
 $(document).ready(function() {
     updateTimeAgo();
 });
+
+// ============================================================
+// Добавить в конец admin-calls.js
+// ============================================================
+
+/**
+ * WebSocket-подписка для страницы активных вызовов.
+ * Новые вызовы появляются в DOM без перезагрузки страницы.
+ */
+function connectCallsWebSocket() {
+    // Переиспользуем глобальное соединение из header (staff-notifications.js)
+    // или создаём новое
+    function subscribe(client) {
+        client.subscribe('/topic/calls', function (message) {
+            const data = JSON.parse(message.body);
+
+            if (data.type === 'NEW_CALL') {
+                // Перезагружаем страницу для отображения новой карточки
+                // (простое решение — карточка формируется Thymeleaf на сервере)
+                location.reload();
+            }
+            // При CALL_RESOLVED карточка уже удалена через acceptCall() локально
+        });
+    }
+
+    if (window.stompClient && window.stompClient.connected) {
+        subscribe(window.stompClient);
+        return;
+    }
+
+    const socket = new SockJS('/ws');
+    const client = Stomp.over(socket);
+    client.debug = null;
+    client.connect({}, function () { subscribe(client); },
+                       function () { setTimeout(connectCallsWebSocket, 5000); });
+}
+
+$(document).ready(function () {
+    connectCallsWebSocket();
+});

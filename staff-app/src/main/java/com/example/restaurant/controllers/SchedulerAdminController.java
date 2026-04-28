@@ -89,4 +89,30 @@ public class SchedulerAdminController {
                 "Оборудование помечено как неисправное, задачи перепланируются.");
         return "redirect:/admin/scheduler";
     }
+
+    /**
+     * REST-эндпоинт для AJAX-обновления данных планировщика.
+     * Вызывается фронтендом при получении WebSocket-события /topic/scheduler.
+     */
+    @GetMapping("/api/stats")
+    @ResponseBody
+    public Map<String, Object> getSchedulerStats() {
+        List<CookingTask> activeTasks = schedulerService.getAllActiveTasksSummary();
+
+        long overdueCount = activeTasks.stream()
+                .filter(t -> t.getPlannedEndTime() != null
+                        && t.getPlannedEndTime().isBefore(LocalDateTime.now())
+                        && t.getStatus() != CookingTaskStatus.DONE)
+                .count();
+
+        long ordersInWork = activeTasks.stream()
+                .map(t -> t.getOrderItem().getOrder().getId())
+                .distinct().count();
+
+        return Map.of(
+                "activeTasks",  activeTasks.size(),
+                "ordersInWork", ordersInWork,
+                "overdue",      overdueCount
+        );
+    }
 }

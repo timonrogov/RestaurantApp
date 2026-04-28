@@ -287,6 +287,15 @@
     margin-bottom: 1rem;
 }
 
+/* Анимация обновления карточки */
+.card-updated {
+    animation: card-flash 1.5s ease;
+}
+@keyframes card-flash {
+    0%   { box-shadow: 0 0 0 3px var(--color3); }
+    100% { box-shadow: none; }
+}
+
 /* === Адаптивность === */
 @media (max-width: 992px) {
     .admin-filter-toolbar {

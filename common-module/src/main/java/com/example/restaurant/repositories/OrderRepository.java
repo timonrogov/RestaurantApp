@@ -119,4 +119,6 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                 WHERE o.id = :orderId
             """)
     Optional<Order> findByIdWithItems(@Param("orderId") Long orderId);
+
+    List<Order> findByStatusNotIn(List<OrderStatus> statuses);
 }

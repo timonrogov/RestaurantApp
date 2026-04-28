@@ -208,6 +208,22 @@
 }
 .kds-toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
 
+.ws-indicator {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-left: 8px;
+    vertical-align: middle;
+}
+.ws-connected    { background-color: var(--success); }
+.ws-disconnected { background-color: var(--error); animation: pulse 1.5s infinite; }
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.3; }
+}
+
 /* 7. Адаптивность */
 @media (max-width: 900px) {
     .kds-board { grid-template-columns: 1fr; overflow-y: auto; }

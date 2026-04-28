@@ -14,12 +14,7 @@ import com.example.restaurant.scheduler.messages.MessageType;
 import com.example.restaurant.scheduler.messages.dto.TaskPlannedBody;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Агент заказа — координатор планирования всего заказа.
@@ -251,45 +246,59 @@ public class OrderAgent extends BaseAgent {
             return;
         }
 
-        // Вычисляем notBefore для задач этого курса
         LocalDateTime notBefore = computeNotBefore(current);
         LocalDateTime deadline = notBefore.plusMinutes(PLANNING_HORIZON_MINUTES);
 
-        log.debug("{}: курс {}, notBefore={}, deadline={}", agentId, current.courseNumber, notBefore, deadline);
-
-        // Загружаем все задачи курса из БД и создаём для каждой TaskAgent
         List<CookingTask> tasks = taskRepository.findAllById(current.taskIds);
 
-        // === ИСПРАВЛЕНИЕ: ВЫЧИСЛЯЕМ УМНЫЙ ДЕДЛАЙН (targetEndTime) ===
         int maxDuration = tasks.stream()
                 .mapToInt(t -> t.getTemplate().getDurationMinutes())
                 .max()
                 .orElse(0);
 
-        // Целевое время синхронизации — это время окончания самого долгого блюда
         LocalDateTime targetEndTime = notBefore.plusMinutes(maxDuration);
         log.debug("{}: курс {}, notBefore={}, targetEndTime={}, deadline={}",
                 agentId, current.courseNumber, notBefore, targetEndTime, deadline);
 
-        for (CookingTask task : tasks) {
-            TaskAgent taskAgent = new TaskAgent(
-                    task,
-                    agentId,
-                    sceneAgent,
-                    taskRepository,
-                    notBefore,
-                    targetEndTime,
-                    deadline
-            );
+        // 1. Сортируем задачи по убыванию длительности
+        List<CookingTask> sortedTasks = tasks.stream()
+                .sorted(Comparator.comparingInt((CookingTask t) ->
+                        t.getTemplate().getDurationMinutes()).reversed())
+                .toList();
 
+        // 2. Сохраняем отсортированную очередь в состояние курса
+        current.sortedTaskIdsToPlan = sortedTasks.stream().map(CookingTask::getId).toList();
+        current.currentTaskIndex = 0;
+
+        // 3. Создаем и регистрируем ВСЕХ агентов, НО НЕ запускаем их (не шлем INIT)
+        for (CookingTask task : sortedTasks) {
+            TaskAgent taskAgent = new TaskAgent(
+                    task, agentId, sceneAgent, taskRepository,
+                    notBefore, targetEndTime, deadline
+            );
             messageBus.register(taskAgent);
             taskIdToAgentId.put(task.getId(), taskAgent.getAgentId());
+        }
 
-            // Запускаем переговоры через INIT
-            send(taskAgent.getAgentId(), MessageType.INIT, null);
+        // 4. Запускаем ТОЛЬКО первого агента из очереди
+        planNextTaskInCurrentCourse();
+    }
 
-            log.debug("{}: создан и запущен TaskAgent {} для задачи #{}",
-                    agentId, taskAgent.getAgentId(), task.getId());
+    /**
+     * Запускает следующую по очереди задачу в текущем курсе.
+     * Вызывается на старте курса и после завершения планирования каждой задачи.
+     */
+    private void planNextTaskInCurrentCourse() {
+        CourseState current = courseStates.get(currentCourseIndex);
+        if (current.currentTaskIndex < current.sortedTaskIdsToPlan.size()) {
+            long nextTaskId = current.sortedTaskIdsToPlan.get(current.currentTaskIndex);
+            current.currentTaskIndex++;
+
+            String taskAgentId = taskIdToAgentId.get(nextTaskId);
+            send(taskAgentId, MessageType.INIT, null);
+
+            log.debug("{}: отправлен INIT агенту {} (по очереди {} из {})",
+                    agentId, taskAgentId, current.currentTaskIndex, current.sortedTaskIdsToPlan.size());
         }
     }
 
@@ -345,7 +354,11 @@ public class OrderAgent extends BaseAgent {
                 courseState.plannedTaskIds.size() + courseState.failedTaskIds.size(),
                 courseState.taskIds.size());
 
-        checkCourseCompletion(courseState);
+        boolean isCourseCompleted = checkCourseCompletion(courseState);
+        if (!isCourseCompleted) {
+            // Если курс еще не завершен, запускаем планирование следующей задачи!
+            planNextTaskInCurrentCourse();
+        }
     }
 
     /**
@@ -374,7 +387,11 @@ public class OrderAgent extends BaseAgent {
                 courseState.plannedTaskIds.size() + courseState.failedTaskIds.size(),
                 courseState.taskIds.size());
 
-        checkCourseCompletion(courseState);
+        boolean isCourseCompleted = checkCourseCompletion(courseState);
+        if (!isCourseCompleted) {
+            // Если курс еще не завершен, запускаем планирование следующей задачи!
+            planNextTaskInCurrentCourse();
+        }
     }
 
     /**
@@ -417,18 +434,18 @@ public class OrderAgent extends BaseAgent {
      * Курс считается завершённым когда каждая его задача либо запланирована,
      * либо провалилась (т.е. ответ получен от всех).
      */
-    private void checkCourseCompletion(CourseState courseState) {
+    private boolean checkCourseCompletion(CourseState courseState) { // Изменили void на boolean
         int resolved = courseState.plannedTaskIds.size() + courseState.failedTaskIds.size();
         int total = courseState.taskIds.size();
 
         if (resolved >= total) {
             log.info("{}: курс {} завершён. Запланировано: {}, провалено: {}.",
-                    agentId,
-                    courseState.courseNumber,
-                    courseState.plannedTaskIds.size(),
-                    courseState.failedTaskIds.size());
+                    agentId, courseState.courseNumber,
+                    courseState.plannedTaskIds.size(), courseState.failedTaskIds.size());
             onCourseCompleted();
+            return true; // Курс завершен
         }
+        return false; // Курс еще в процессе
     }
 
     /**
@@ -555,6 +572,11 @@ public class OrderAgent extends BaseAgent {
          * null если ни одна задача ещё не запланирована.
          */
         LocalDateTime latestPlannedEnd = null;
+
+        // === ДОБАВЛЯЕМ ПОЛЯ ДЛЯ ПОСЛЕДОВАТЕЛЬНОГО ЗАПУСКА ===
+        List<Long> sortedTaskIdsToPlan = new ArrayList<>();
+        int currentTaskIndex = 0;
+        // ====================================================
 
         CourseState(int courseNumber, int syncGapMinutes) {
             this.courseNumber = courseNumber;

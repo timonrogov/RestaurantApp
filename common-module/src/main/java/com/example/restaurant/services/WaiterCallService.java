@@ -1,10 +1,12 @@
 package com.example.restaurant.services;
 
 import com.example.restaurant.enums.CallStatus;
+import com.example.restaurant.events.WaiterCallEvent;
 import com.example.restaurant.models.Client;
 import com.example.restaurant.models.WaiterCall;
 import com.example.restaurant.repositories.WaiterCallRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,10 +17,12 @@ import java.util.List;
 public class WaiterCallService {
 
     private final WaiterCallRepository waiterCallRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Autowired
-    public WaiterCallService(WaiterCallRepository waiterCallRepository) {
+    public WaiterCallService(WaiterCallRepository waiterCallRepository, ApplicationEventPublisher eventPublisher) {
         this.waiterCallRepository = waiterCallRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -43,7 +47,12 @@ public class WaiterCallService {
         call.setClient(client);
         call.setCallTime(LocalDateTime.now());
         call.setStatus(CallStatus.ACTIVE);
-        waiterCallRepository.save(call);
+        WaiterCall saved = waiterCallRepository.save(call);
+
+        // публикуем событие после сохранения
+        long count = waiterCallRepository.countByStatus(CallStatus.ACTIVE);
+        eventPublisher.publishEvent(new WaiterCallEvent(
+                this, WaiterCallEvent.Type.CREATED, saved.getId(), tableNumber, count));
     }
 
     public List<WaiterCall> getActiveCalls() {
@@ -62,5 +71,10 @@ public class WaiterCallService {
         call.setStatus(CallStatus.CLOSED);
         call.setResolvedTime(LocalDateTime.now());
         waiterCallRepository.save(call);
+
+        // публикуем событие после закрытия
+        long count = waiterCallRepository.countByStatus(CallStatus.ACTIVE);
+        eventPublisher.publishEvent(new WaiterCallEvent(
+                this, WaiterCallEvent.Type.RESOLVED, id, call.getTableNumber(), count));
     }
 }

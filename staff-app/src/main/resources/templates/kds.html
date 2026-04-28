@@ -10,6 +10,9 @@
     <link rel="stylesheet" th:href="@{/css/kds.css}">
     <meta th:name="_csrf"        th:content="${_csrf.token}"/>
     <meta th:name="_csrf_header" th:content="${_csrf.headerName}"/>
+    <!-- WebSocket: SockJS + STOMP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
 </head>
 <body class="kds-page-body">
 
@@ -45,6 +48,7 @@
         <button class="kds-refresh-btn" onclick="loadTasks()">
             <i class="fas fa-sync-alt" id="refresh-icon"></i> Обновить
         </button>
+        <span id="ws-status" class="ws-indicator ws-disconnected" title="Подключение..."></span>
     </div>
 </div>
 
@@ -137,6 +141,51 @@
     let currentDelayTaskId = null;
     let selectedDelayMinutes = 10;
 
+    // ============================================================
+    // WEBSOCKET
+    // ============================================================
+
+    /**
+     * Глобальный STOMP-клиент (экспортируем для использования
+     * в staff-notifications.js через window.stompClient).
+     */
+    let stompClient = null;
+
+    function connectWebSocket() {
+        const socket = new SockJS('/ws');
+        stompClient = Stomp.over(socket);
+        window.stompClient = stompClient; // Делаем доступным глобально
+
+        // Отключаем дефолтный вывод в консоль (необязательно)
+        stompClient.debug = null;
+
+        stompClient.connect({}, function (frame) {
+            console.log('KDS WebSocket подключен');
+            updateConnectionStatus(true);
+
+            // Подписываемся на топик KDS — придёт сигнал когда задачи изменятся
+            stompClient.subscribe('/topic/kds', function (message) {
+                loadTasks(); // Загружаем актуальные данные через REST
+            });
+
+            // Первая загрузка задач
+            loadTasks();
+
+        }, function (error) {
+            console.warn('KDS WebSocket отключён, повтор через 5 сек:', error);
+            updateConnectionStatus(false);
+            // Автопереподключение через 5 секунд
+            setTimeout(connectWebSocket, 5000);
+        });
+    }
+
+    function updateConnectionStatus(connected) {
+        const indicator = document.getElementById('ws-status');
+        if (!indicator) return;
+        indicator.className = connected ? 'ws-indicator ws-connected' : 'ws-indicator ws-disconnected';
+        indicator.title = connected ? 'Соединение активно' : 'Соединение потеряно...';
+    }
+
     function loadTasks() {
         const icon = document.getElementById('refresh-icon');
         icon.style.transition = 'transform 0.5s ease';
@@ -178,9 +227,24 @@
         div.className = cls.join(' ');
 
         let badges = '';
-        if (task.overdue)           badges += `<span class="kds-badge overdue"><i class="fas fa-exclamation-circle"></i> Задержка</span>`;
-        else if (task.urgent)       badges += `<span class="kds-badge urgent"><i class="fas fa-bolt"></i> Срочно</span>`;
-        if (task.status === 'DONE') badges += `<span class="kds-badge done-badge"><i class="fas fa-check"></i> Готово</span>`;
+
+        // === ИСПРАВЛЕНИЕ: НОВАЯ ЛОГИКА ОТОБРАЖЕНИЯ БЕЙДЖЕЙ ===
+        if (task.status !== 'DONE' && task.status !== 'CANCELLED') {
+            if (task.totalDelayMinutes > 0) {
+                // Наша новая крутая надпись!
+                badges += `<span class="kds-badge overdue"><i class="fas fa-exclamation-circle"></i> Задержка! (сдвиг на ${task.totalDelayMinutes} мин.)</span>`;
+            } else if (task.minutesLeft < 0) {
+                // На случай если мы еще не успели перепланировать (до срабатывания крона)
+                badges += `<span class="kds-badge overdue"><i class="fas fa-exclamation-circle"></i> Задержка</span>`;
+            } else if (task.urgent) {
+                badges += `<span class="kds-badge urgent"><i class="fas fa-bolt"></i> Срочно</span>`;
+            }
+        }
+
+        if (task.status === 'DONE') {
+            badges += `<span class="kds-badge done-badge"><i class="fas fa-check"></i> Готово</span>`;
+        }
+        // =====================================================
 
         const course = task.courseNumber > 1
             ? `<span class="kds-course-badge">Курс ${task.courseNumber}</span>` : '';
@@ -293,10 +357,11 @@
             String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0');
     }
 
-    loadTasks();
-    updateClock();
-    setInterval(loadTasks,   15000);
-    setInterval(updateClock, 10000);
+    document.addEventListener('DOMContentLoaded', function () {
+        connectWebSocket();
+        updateClock();
+        setInterval(updateClock, 10000); // Часы обновляем по-прежнему
+    });
 </script>
 
 </body>

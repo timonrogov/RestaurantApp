@@ -35,17 +35,17 @@
     <div class="sched-stat-row">
         <div class="sched-stat-tile">
             <div class="sched-stat-icon" style="color: var(--color3)"><i class="fas fa-fire-alt"></i></div>
-            <div class="sched-stat-value" th:text="${activeTasks.size()}">0</div>
+            <div class="sched-stat-value" id="stat-active-tasks" th:text="${activeTasks.size()}">0</div>
             <div class="sched-stat-label">Активных задач</div>
         </div>
         <div class="sched-stat-tile">
             <div class="sched-stat-icon" style="color: var(--success)"><i class="fas fa-clipboard-list"></i></div>
-            <div class="sched-stat-value" th:text="${tasksByOrder.size()}">0</div>
+            <div class="sched-stat-value" id="stat-orders-in-work" th:text="${tasksByOrder.size()}">0</div>
             <div class="sched-stat-label">Заказов в работе</div>
         </div>
-        <div class="sched-stat-tile" th:classappend="${!overdueTasks.isEmpty()} ? ' sched-stat-danger'">
+        <div class="sched-stat-tile" id="stat-overdue-tile" th:classappend="${!overdueTasks.isEmpty()} ? ' sched-stat-danger'">
             <div class="sched-stat-icon" style="color: var(--error)"><i class="fas fa-exclamation-triangle"></i></div>
-            <div class="sched-stat-value" th:text="${overdueTasks.size()}">0</div>
+            <div class="sched-stat-value" id="stat-overdue" th:text="${overdueTasks.size()}">0</div>
             <div class="sched-stat-label">Просроченных</div>
         </div>
         <div class="sched-stat-tile">
@@ -176,5 +176,9 @@
 
     </div>
 </div>
+<!-- ДОБАВЛЯЕМ ПОДКЛЮЧЕНИЕ JQUERY И COMMON.JS -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script th:src="@{/js/common.js}"></script>
+<script th:src="@{/js/admin-scheduler.js}"></script>
 </body>
 </html>

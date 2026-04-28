@@ -11,6 +11,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" th:href="@{/css/common.css}">
     <link rel="stylesheet" th:href="@{/css/orders.css}">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
 </head>
 <body>
 
@@ -41,7 +44,10 @@
 
     <!-- 2. Список заказов -->
     <div th:unless="${orders.isEmpty()}" class="orders-grid">
-        <div th:each="order : ${orders}" class="order-card-item">
+        <div th:each="order : ${orders}"
+             class="order-card-item"
+             th:attr="data-order-id=${order.id},
+               data-order-active=${order.status.name() != 'SERVED' and order.status.name() != 'CANCELED'}">
 
             <div class="card-header">
                 <span class="order-number">№ <span th:text="${order.id}"></span></span>
@@ -97,5 +103,6 @@
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
 <script th:src="@{/js/common.js}"></script>
+<script th:src="@{/js/orders.js}"></script>
 </body>
 </html>

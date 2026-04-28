@@ -3,6 +3,7 @@ package com.example.restaurant.scheduler.config;
 import com.example.restaurant.repositories.CookingTaskRepository;
 import com.example.restaurant.repositories.CookingTaskTemplateRepository;
 import com.example.restaurant.repositories.OrderCourseRepository;
+import com.example.restaurant.repositories.OrderRepository;
 import com.example.restaurant.scheduler.dispatcher.DispatcherAgent;
 import com.example.restaurant.scheduler.dispatcher.MessageBus;
 import org.springframework.context.annotation.Bean;
@@ -21,12 +22,14 @@ public class SchedulerConfig {
     public DispatcherAgent dispatcherAgent(MessageBus messageBus,
                                            CookingTaskRepository taskRepository,
                                            CookingTaskTemplateRepository templateRepository,
-                                           OrderCourseRepository orderCourseRepository) {
+                                           OrderCourseRepository orderCourseRepository,
+                                           OrderRepository orderRepository) {
         return new DispatcherAgent(
                 messageBus,
                 taskRepository,
                 templateRepository,
-                orderCourseRepository
+                orderCourseRepository,
+                orderRepository
         );
     }
 }

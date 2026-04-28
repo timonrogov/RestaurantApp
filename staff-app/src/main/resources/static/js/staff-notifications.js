@@ -1,54 +1,73 @@
 /**
  * staff-notifications.js
- * Глобальный скрипт для проверки новых вызовов официанта.
- * Использует localStorage для предотвращения повторных уведомлений при перезагрузке.
+ * Глобальный скрипт для уведомлений персонала.
+ * Использует WebSocket вместо HTTP-поллинга.
+ *
+ * Стратегия соединения:
+ * - Если kds.js уже создал window.stompClient — переиспользуем его.
+ * - Иначе создаём собственное соединение.
  */
 
-$(document).ready(function() {
+$(document).ready(function () {
 
-    const POLLING_INTERVAL = 15000;
-    const STORAGE_KEY = 'restaurant_last_call_count'; // Ключ для хранения в браузере
+    const STORAGE_KEY = 'restaurant_last_call_count';
 
-    function checkActiveCalls() {
-        $.ajax({
-            url: '/api/admin/calls/count',
-            method: 'GET',
-            success: function(count) {
-                // 1. Всегда обновляем бейдж
-                updateBadge(count);
+    function subscribeToCallUpdates(client) {
+        client.subscribe('/topic/calls', function (message) {
+            const data = JSON.parse(message.body);
 
-                // 2. Получаем предыдущее сохраненное значение (или 0, если его нет)
-                let lastKnownCount = parseInt(localStorage.getItem(STORAGE_KEY) || '0');
+            // Обновляем бейдж всегда
+            updateBadge(data.activeCallsCount);
 
-                // 3. Показываем уведомление ТОЛЬКО если количество выросло
-                // (Это значит, что поступил РЕАЛЬНО новый вызов)
-                if (count > lastKnownCount) {
-                    toastr.info('Поступил новый вызов официанта!', 'Внимание');
-                    playNotificationSound(); // Опционально: звук
+            // Уведомление показываем только при новом вызове
+            if (data.type === 'NEW_CALL') {
+                const lastKnown = parseInt(localStorage.getItem(STORAGE_KEY) || '0');
+                if (data.activeCallsCount > lastKnown) {
+                    toastr.info(
+                        'Столик ' + data.tableNumber + ' вызывает официанта!',
+                        'Новый вызов'
+                    );
+                    playNotificationSound();
                 }
-
-                // 4. Сохраняем текущее количество в память браузера
-                // Чтобы при следующей проверке или перезагрузке страницы знать актуальное число
-                localStorage.setItem(STORAGE_KEY, count);
-            },
-            error: function(err) {
-                console.warn('Ошибка при проверке вызовов:', err);
             }
+
+            localStorage.setItem(STORAGE_KEY, data.activeCallsCount);
+        });
+    }
+
+    function initWebSocket() {
+        // Переиспользуем соединение kds.js если оно есть и активно
+        if (window.stompClient && window.stompClient.connected) {
+            subscribeToCallUpdates(window.stompClient);
+            return;
+        }
+
+        // Иначе создаём собственное соединение
+        const socket = new SockJS('/ws');
+        const client = Stomp.over(socket);
+        client.debug = null;
+
+        client.connect({}, function () {
+            subscribeToCallUpdates(client);
+            // Запрашиваем текущее количество при подключении
+            $.get('/api/admin/calls/count', function (count) {
+                updateBadge(count);
+                localStorage.setItem(STORAGE_KEY, count);
+            });
+        }, function (error) {
+            // При ошибке — повтор через 10 секунд
+            setTimeout(initWebSocket, 10000);
         });
     }
 
     function updateBadge(count) {
         const $badge = $('#callBadge');
-
         if (count > 0) {
-            $badge.text(count);
-            $badge.show();
-
-            // Анимацию добавляем только если число изменилось (чтобы не дергалось постоянно)
-            let lastKnownCount = parseInt(localStorage.getItem(STORAGE_KEY) || '0');
-            if (count !== lastKnownCount) {
-                $badge.removeClass('animate__bounceIn'); // Сброс анимации
-                void $badge[0].offsetWidth; // Трюк для перезапуска CSS анимации
+            const lastKnown = parseInt(localStorage.getItem(STORAGE_KEY) || '0');
+            $badge.text(count).show();
+            if (count !== lastKnown) {
+                $badge.removeClass('animate__bounceIn');
+                void $badge[0].offsetWidth;
                 $badge.addClass('animate__bounceIn');
             }
         } else {
@@ -56,16 +75,11 @@ $(document).ready(function() {
         }
     }
 
-    // Простая функция звука (короткий "дзынь")
     function playNotificationSound() {
-        // Можно добавить файл звука в /static/sounds/bell.mp3
         // const audio = new Audio('/sounds/bell.mp3');
         // audio.play().catch(e => console.log('Autoplay blocked'));
     }
 
-    // Первый запуск
-    checkActiveCalls();
-
-    // Периодический опрос
-    setInterval(checkActiveCalls, POLLING_INTERVAL);
+    // Небольшая задержка, чтобы дать kds.js время создать соединение первым (если он есть)
+    setTimeout(initWebSocket, 500);
 });

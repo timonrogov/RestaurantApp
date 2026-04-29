@@ -94,4 +94,26 @@ public interface CookingTaskRepository extends JpaRepository<CookingTask, Long> 
             "  com.example.restaurant.enums.CookingTaskStatus.CANCELLED" +
             ")")
     long countUnfinishedTasksByOrderId(@Param("orderId") Long orderId);
+
+    /**
+     * Выборка задач для диаграммы Ганта за конкретный день.
+     *
+     * Включает задачи, у которых:
+     *   - plannedStartTime попадает в диапазон [dayStart, dayEnd), ИЛИ
+     *   - статус IN_PROGRESS и actualStartTime в том же диапазоне
+     *     (задача могла начаться раньше планового времени)
+     *
+     * @param dayStart начало рабочего дня (например 2025-05-16T09:00)
+     * @param dayEnd   конец рабочего дня  (например 2025-05-16T22:00)
+     */
+    @Query("""
+    SELECT t FROM CookingTask t
+    WHERE (t.plannedStartTime >= :dayStart AND t.plannedStartTime < :dayEnd)
+       OR (t.status = com.example.restaurant.enums.CookingTaskStatus.IN_PROGRESS
+           AND t.actualStartTime >= :dayStart AND t.actualStartTime < :dayEnd)
+    ORDER BY t.plannedStartTime ASC NULLS LAST
+    """)
+    List<CookingTask> findForGantt(
+            @Param("dayStart") LocalDateTime dayStart,
+            @Param("dayEnd")   LocalDateTime dayEnd);
 }

@@ -215,3 +215,663 @@
 .sched-empty i { font-size: 2rem; margin-bottom: .8rem; display: block; }
 .sched-empty p { margin: 0 0 1rem; font-size: .9rem; }
 .sched-empty-fullrow { grid-column: 1 / -1; }
+
+/* ================================================================
+   GANTT CHART STYLES
+   Использует только переменные из common.css.
+   Оформление согласовано с остальными страницами staff-app.
+   ================================================================ */
+
+/* --- Переключатель вида --- */
+.view-toggle {
+    display: flex;
+    gap: 0;
+    border: 1px solid var(--color3);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.view-toggle-btn {
+    background: transparent;
+    color: var(--color3);
+    border: none;
+    border-radius: 0;
+    padding: 8px 16px;
+    font-family: 'Lato', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+}
+.view-toggle-btn:hover {
+    background: rgba(159, 87, 39, 0.08);
+    transform: none;
+    box-shadow: none;
+}
+.view-toggle-btn--active {
+    background: var(--color3);
+    color: var(--color0);
+}
+.view-toggle-btn--active:hover {
+    background: var(--color4);
+}
+
+/* --- Оболочка диаграммы --- */
+.gantt-wrapper {
+    display: flex;
+    overflow: hidden;
+    border-top: 1px solid var(--color2);
+    max-height: 600px;       /* ограничиваем высоту, внутри — скролл */
+    min-height: 200px;
+}
+
+/* --- Левая колонка (метки поваров) --- */
+.gantt-labels-col {
+    width: 210px;
+    flex-shrink: 0;
+    overflow: hidden;        /* скролл синхронизируется через JS */
+    border-right: 2px solid var(--color2);
+    background: var(--color0);
+    z-index: 3;
+}
+
+.gantt-corner {
+    height: 48px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--color4);
+    background: var(--color1);
+    border-bottom: 1px solid var(--color2);
+}
+.gantt-corner i { color: var(--color3); }
+
+.gantt-label-rows {
+    /* высоты строк задаются JS (совпадают с .gantt-task-row) */
+}
+
+.gantt-label-row {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0 14px;
+    border-bottom: 1px solid var(--color1);
+    box-sizing: border-box;
+}
+.gantt-label-name {
+    font-weight: 700;
+    font-size: 0.88rem;
+    color: var(--color5);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.gantt-label-spec {
+    font-size: 0.72rem;
+    color: var(--color3);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-top: 2px;
+}
+
+/* --- Правая колонка (таймлайн) --- */
+.gantt-timeline-col {
+    flex: 1;
+    overflow: auto;          /* прокручивается в обе стороны */
+    position: relative;
+}
+
+/* --- Временная ось --- */
+.gantt-axis {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    height: 48px;
+    background: var(--color1);
+    border-bottom: 1px solid var(--color2);
+    display: flex;
+    align-items: flex-end;
+    position: sticky;        /* прилипает к верху при вертикальном скролле */
+    top: 0;
+}
+
+.gantt-axis-inner {
+    position: relative;
+    height: 100%;
+    flex-shrink: 0;          /* ширина задаётся JS */
+}
+
+.gantt-hour-tick {
+    position: absolute;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+.gantt-hour-tick::before {
+    content: '';
+    display: block;
+    width: 1px;
+    height: 12px;
+    background: var(--color2);
+}
+.gantt-hour-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--color4);
+    margin-top: 3px;
+    white-space: nowrap;
+    transform: translateX(-50%);
+}
+
+.gantt-minute-tick {
+    position: absolute;
+    bottom: 0;
+    width: 1px;
+    height: 6px;
+    background: var(--color2);
+    opacity: 0.5;
+}
+
+/* Вертикальные линии часов через строки задач */
+.gantt-hour-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--color2);
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+/* --- Строки задач --- */
+.gantt-task-rows {
+    position: relative;
+}
+
+.gantt-task-row {
+    position: relative;
+    border-bottom: 1px solid var(--color1);
+    box-sizing: border-box;
+    background: var(--color0);
+    /* высота задаётся JS через style.height */
+}
+.gantt-task-row:hover {
+    background: rgba(238, 226, 214, 0.3);
+}
+
+/* --- Полоска задачи --- */
+.gantt-bar {
+    position: absolute;
+    top: 10px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0 8px;
+    overflow: hidden;
+    cursor: pointer;
+    box-sizing: border-box;
+    transition: box-shadow 0.2s ease, filter 0.2s ease;
+    /* высота = ROW_HEIGHT - 20px, задаётся JS */
+}
+.gantt-bar:hover {
+    box-shadow: 0 4px 14px rgba(104, 50, 4, 0.18);
+    filter: brightness(1.04);
+    z-index: 5;
+}
+.gantt-bar:active {
+    filter: brightness(0.97);
+}
+
+/* Цвета полосок по статусу */
+.gantt-bar--planned {
+    background: var(--color1);
+    border: 1px solid var(--color2);
+    color: var(--color4);
+}
+.gantt-bar--in_progress {
+    background: var(--color3);
+    border: 1px solid var(--color4);
+    color: var(--color0);
+}
+.gantt-bar--done {
+    background: rgba(40, 167, 69, 0.12);
+    border: 1px solid rgba(40, 167, 69, 0.4);
+    color: var(--success);
+}
+.gantt-bar--pending {
+    background: var(--color2);
+    border: 1px solid var(--color2);
+    color: var(--color5);
+    opacity: 0.65;
+}
+.gantt-bar--failed,
+.gantt-bar--cancelled {
+    background: rgba(220, 53, 69, 0.1);
+    border: 1px solid var(--error);
+    color: var(--error);
+}
+
+/* Содержимое полоски */
+.gantt-bar-order {
+    font-family: 'Playfair Display', serif;
+    font-size: 0.82rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+.gantt-bar-img {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+.gantt-bar-img-fallback {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.25);
+}
+.gantt-bar-text {
+    flex: 1;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 0.78rem;
+}
+.gantt-bar-dish {
+    font-weight: 600;
+}
+.gantt-bar-step {
+    font-size: 0.7rem;
+    opacity: 0.75;
+}
+.gantt-bar-equip {
+    flex-shrink: 0;
+    font-size: 0.72rem;
+    opacity: 0.85;
+    margin-left: auto;
+}
+
+/* Просроченная полоска — пульсация */
+.gantt-bar--overdue {
+    animation: gantt-bar-pulse 2s infinite;
+}
+@keyframes gantt-bar-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+    50%       { box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.25); }
+}
+
+/* --- Линия текущего времени --- */
+.gantt-now-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background-color: #e74c3c !important; /* Ярко-красный */
+    opacity: 0.9;
+    pointer-events: none;
+    z-index: 1000 !important; /* Гарантированно поверх задач */
+    box-shadow: 0 0 6px rgba(220, 53, 69, 0.8);
+}
+
+.gantt-now-label {
+    position: absolute;
+    top: 6px !important; /* Опускаем метку ВНУТРЬ оси, чтобы ее не обрезало! */
+    transform: translateX(-50%);
+    background-color: #e74c3c !important;
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 6px;
+    white-space: nowrap;
+    z-index: 1001 !important;
+    box-shadow: 0 4px 8px rgba(220, 53, 69, 0.4);
+    display: flex;
+    align-items: center;
+}
+
+/* Пульсирующий кружочек внутри метки "Сейчас" */
+.gantt-now-label::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    background-color: #fff;
+    border-radius: 50%;
+    margin-right: 6px;
+    animation: pulse-dot 1.5s infinite;
+}
+
+@keyframes pulse-dot {
+    0%   { transform: scale(0.8); opacity: 0.5; }
+    50%  { transform: scale(1.5); opacity: 1; }
+    100% { transform: scale(0.8); opacity: 0.5; }
+}
+
+/* --- Управляющая панель (дата + зум) --- */
+.gantt-date-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+}
+.gantt-nav-btn {
+    background: transparent;
+    border: 1px solid var(--color2);
+    color: var(--color4);
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    transition: all 0.2s ease;
+    padding: 0;
+}
+.gantt-nav-btn:hover {
+    background: var(--color3);
+    color: var(--color0);
+    border-color: var(--color3);
+    transform: none;
+    box-shadow: none;
+}
+.gantt-date-label {
+    font-family: 'Playfair Display', serif;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--color5);
+    min-width: 210px;
+    text-align: center;
+}
+.gantt-today-btn {
+    background: transparent;
+    border: 1px solid var(--color3);
+    color: var(--color3);
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Lato', sans-serif;
+    transition: all 0.2s ease;
+}
+.gantt-today-btn:hover {
+    background: var(--color3);
+    color: var(--color0);
+    transform: none;
+    box-shadow: none;
+}
+.gantt-zoom-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 16px;
+}
+.gantt-zoom-icon {
+    color: var(--color3);
+    font-size: 0.85rem;
+}
+.gantt-zoom-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 90px;
+    height: 4px;
+    border-radius: 2px;
+    border: none;
+    background: var(--color2);
+    outline: none;
+    padding: 0;
+}
+.gantt-zoom-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--color3);
+    cursor: pointer;
+    border: 2px solid var(--color0);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+.gantt-zoom-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--color3);
+    cursor: pointer;
+    border: 2px solid var(--color0);
+}
+
+/* --- Лоадер --- */
+.gantt-loader {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 3rem;
+    color: var(--color3);
+    font-weight: 600;
+}
+.gantt-loader i { font-size: 1.2rem; }
+
+/* --- Пустое состояние --- */
+.gantt-empty {
+    text-align: center;
+    padding: 3rem;
+    color: var(--color2);
+}
+.gantt-empty i { font-size: 2rem; margin-bottom: 0.8rem; display: block; }
+
+/* --- Попап с деталями задачи --- */
+.gantt-popup {
+    position: fixed;
+    z-index: 1000;
+    background: var(--color0);
+    border: 1px solid var(--color2);
+    border-radius: 12px;
+    box-shadow: 0 12px 40px rgba(104, 50, 4, 0.2);
+    width: 320px;
+    animation: gantt-popup-in 0.15s ease;
+}
+@keyframes gantt-popup-in {
+    from { opacity: 0; transform: translateY(8px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0)  scale(1); }
+}
+
+.gantt-popup-close {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    background: transparent;
+    border: none;
+    color: var(--color3);
+    font-size: 0.9rem;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+.gantt-popup-close:hover {
+    background: var(--color1);
+    transform: none;
+    box-shadow: none;
+}
+
+.gantt-popup-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--color1);
+}
+.gantt-popup-img {
+    width: 56px;
+    height: 56px;
+    border-radius: 10px;
+    object-fit: cover;
+    border: 1px solid var(--color2);
+    flex-shrink: 0;
+}
+.gantt-popup-img-fallback {
+    width: 56px;
+    height: 56px;
+    border-radius: 10px;
+    background: var(--color1);
+    border: 1px solid var(--color2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color3);
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+.gantt-popup-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--color5);
+    line-height: 1.2;
+}
+.gantt-popup-subtitle {
+    font-size: 0.78rem;
+    color: var(--color3);
+    margin-top: 2px;
+}
+
+.gantt-popup-body {
+    padding: 12px 16px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.gantt-popup-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.82rem;
+    color: var(--color4);
+}
+.gantt-popup-row i {
+    width: 14px;
+    color: var(--color3);
+    text-align: center;
+    flex-shrink: 0;
+}
+.gantt-popup-row strong {
+    color: var(--color5);
+}
+
+.gantt-popup-arrow {
+    position: absolute;
+    bottom: -9px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 9px solid transparent;
+    border-right: 9px solid transparent;
+    border-top: 9px solid var(--color0);
+    filter: drop-shadow(0 2px 2px rgba(104, 50, 4, 0.1));
+}
+.gantt-popup--below .gantt-popup-arrow {
+    bottom: auto;
+    top: -9px;
+    border-top: none;
+    border-bottom: 9px solid var(--color0);
+}
+
+/* ================================================================
+   GANTT CHART УЛУЧШЕНИЯ (ДОБАВИТЬ В КОНЕЦ ФАЙЛА)
+   ================================================================ */
+
+/* Отступ снизу для всего блока Ганта, чтобы не прилипал к футеру */
+#viewGantt {
+    margin-bottom: 5rem;
+}
+
+/* Курсоры для перетаскивания (Pan/Drag) */
+.gantt-timeline-col {
+    cursor: grab;
+}
+.gantt-timeline-col.is-dragging {
+    cursor: grabbing;
+    user-select: none; /* Запрещаем выделение текста при перетягивании */
+}
+/* Чтобы клики по карточкам работали корректно при перетаскивании */
+.gantt-bar {
+    user-select: none;
+}
+
+/* --- Умная сетка (новые метки для крупного зума) --- */
+.gantt-sub-label {
+    position: absolute;
+    bottom: 8px; /* Чуть выше засечки */
+    transform: translateX(-50%);
+    font-size: 0.65rem;
+    color: var(--color3);
+    font-weight: 600;
+    opacity: 0.8;
+}
+
+.gantt-minute-tick--labeled {
+    height: 10px; /* Делаем засечку с цифрами чуть выше */
+    opacity: 0.8;
+}
+
+.gantt-hour-line--minor {
+    opacity: 0.15; /* Менее заметные линии для 15-ти и 5-ти минуток */
+    border-left: 1px dashed var(--color2);
+    background: transparent;
+}
+
+/* --- Улучшенная линия "Сейчас" --- */
+.gantt-now-line {
+    z-index: 20; /* Выносим поверх всех задач */
+    background: var(--error);
+    box-shadow: 0 0 5px rgba(220, 53, 69, 0.5); /* Легкое свечение линии */
+}
+
+.gantt-now-label {
+    top: -40px; /* Поднимаем чуть выше */
+    z-index: 21;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
+}
+
+/* Пульсирующий кружочек внутри метки "Сейчас" */
+.gantt-now-label::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    background: #fff;
+    border-radius: 50%;
+    margin-right: 6px;
+    animation: pulse-dot 1.5s infinite;
+}
+
+@keyframes pulse-dot {
+    0%   { transform: scale(0.8); opacity: 0.5; }
+    50%  { transform: scale(1.5); opacity: 1; }
+    100% { transform: scale(0.8); opacity: 0.5; }
+}

@@ -1,5 +1,7 @@
 package com.example.restaurant.scheduler.messages.dto;
 
+import lombok.ToString;
+
 import java.time.LocalDateTime;
 
 /**
@@ -12,6 +14,7 @@ import java.time.LocalDateTime;
  * Если available=false — всё оборудование данного типа занято.
  * TaskAgent должен попробовать следующий вариант повара (может, другое время).
  */
+@ToString
 public class EquipmentResponseBody {
 
     private final boolean available;

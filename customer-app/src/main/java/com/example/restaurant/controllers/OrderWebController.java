@@ -14,6 +14,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import java.time.LocalDate;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import java.security.Principal;
 import java.util.HashMap;
@@ -157,14 +160,15 @@ public class OrderWebController {
 
         List<Order> orders;
 
-        // ЛОГИКА ФИЛЬТРАЦИИ
         if ("ACTIVE".equals(statusFilter)) {
-            // 1. Если запросили "ACTIVE" — берем список статусов
             orders = orderService.getOrdersByClientAndStatuses(client,
                     List.of(OrderStatus.COOKING, OrderStatus.READY));
-        }
-        else if (statusFilter != null && !statusFilter.isEmpty()) {
-            // 2. Если другой конкретный статус (SERVED, CANCELED)
+            model.addAttribute("orders", orders);
+            model.addAttribute("todayOrders", List.of());
+            model.addAttribute("pastOrders", List.of());
+            model.addAttribute("groupedMode", false);
+
+        } else if (statusFilter != null && !statusFilter.isEmpty()) {
             try {
                 OrderStatus status = OrderStatus.valueOf(statusFilter);
                 orders = orderService.getOrdersByClientAndStatus(client, status);
@@ -172,15 +176,27 @@ public class OrderWebController {
                 orders = orderService.getOrderHistory(client);
                 statusFilter = null;
             }
+            model.addAttribute("orders", orders);
+            model.addAttribute("todayOrders", List.of());
+            model.addAttribute("pastOrders", List.of());
+            model.addAttribute("groupedMode", false);
+
         } else {
-            // 3. Если фильтра нет — показываем историю (всё кроме корзины)
+            // Режим «Все» — группируем по дате
             orders = orderService.getOrderHistory(client);
+            LocalDate today = LocalDate.now();
+
+            Map<Boolean, List<Order>> grouped = orders.stream()
+                    .collect(Collectors.partitioningBy(o ->
+                            o.getTimeSlot().getDay().getWorkDate().equals(today)));
+
+            model.addAttribute("todayOrders", grouped.get(true));
+            model.addAttribute("pastOrders",  grouped.get(false));
+            model.addAttribute("orders",      orders);   // оставляем для совместимости
+            model.addAttribute("groupedMode", true);
         }
 
-        model.addAttribute("orders", orders);
         model.addAttribute("statusFilter", statusFilter);
-        // allStatuses нам здесь особо не нужен, так как мы используем кнопки, а не select
-
         return "orders";
     }
 

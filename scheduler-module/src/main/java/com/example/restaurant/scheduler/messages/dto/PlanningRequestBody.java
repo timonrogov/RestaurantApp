@@ -1,5 +1,7 @@
 package com.example.restaurant.scheduler.messages.dto;
 
+import lombok.ToString;
+
 /**
  * Тело сообщения PLANNING_REQUEST.
  * Отправляется TaskAgent → CookAgent (или EquipmentTypeAgent).
@@ -11,6 +13,7 @@ package com.example.restaurant.scheduler.messages.dto;
  * модели, но проверка нужна для варианта "conflict" — пока шли переговоры
  * другой TaskAgent мог занять того же кандидата на вытеснение).
  */
+@ToString
 public class PlanningRequestBody {
 
     /** ID задачи, для которой резервируется слот. */

@@ -57,6 +57,7 @@ public class CookAgent extends BaseAgent {
         switch (message.getType()) {
             case PARAMS_REQUEST   -> handleParamsRequest(message);
             case PLANNING_REQUEST -> handlePlanningRequest(message);
+            case FREE_SLOT        -> handleFreeSlot(message);
             default -> log.warn("{}: получено неожиданное сообщение типа {}",
                     agentId, message.getType());
         }
@@ -434,6 +435,17 @@ public class CookAgent extends BaseAgent {
 
         log.info("{}: расписание очищено, {} задач уведомлены о перепланировании",
                 agentId, currentSlots.size());
+    }
+
+    /**
+     * Обработать запрос добровольного освобождения слота.
+     * TaskAgent присылает его, когда OrderAgent просит его перепланироваться.
+     */
+    private void handleFreeSlot(Message message) {
+        Long taskId = (Long) message.getBody();
+        if (schedule.removeSlotByTaskId(taskId)) {
+            log.info("{}: слот задачи {} легально освобожден по запросу FREE_SLOT", agentId, taskId);
+        }
     }
 
     // -----------------------------------------------------------------------

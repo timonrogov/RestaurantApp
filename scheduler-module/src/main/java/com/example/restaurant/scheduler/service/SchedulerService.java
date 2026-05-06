@@ -29,6 +29,7 @@ import com.example.restaurant.events.CookingTaskUpdatedEvent;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
@@ -232,11 +233,31 @@ public class SchedulerService {
     @Transactional
     public void markTaskStarted(Long taskId) {
         CookingTask task = getTaskOrThrow(taskId);
+        LocalDateTime now = LocalDateTime.now();
+
+        // 1. Берем чистую длительность из шаблона (техкарты), а не считаем разницу между плановыми датами
+        // Это гарантирует, что мы не накопим ошибки округления
+        int duration = task.getTemplate().getDurationMinutes();
+
+        // 2. Считаем реальный сдвиг для истории (даже если это секунды)
+        int shiftMinutes = (int) ChronoUnit.MINUTES.between(task.getPlannedStartTime(), now);
+
         task.setStatus(CookingTaskStatus.IN_PROGRESS);
-        task.setActualStartTime(LocalDateTime.now());
+        task.setActualStartTime(now);
+        task.setLocalOverdue(false);
+
+        // 3. ПРИНУДИТЕЛЬНО приравниваем план к факту и сдвигаем конец
+        task.setPlannedStartTime(now);
+        task.setPlannedEndTime(now.plusMinutes(duration));
+
         cookingTaskRepository.save(task);
+
+        // 4. Всегда бросаем событие, если была хоть какая-то разница (для синхронизации соседей)
+        // Если shiftMinutes оказался 0 из-за секунд, но секунды были — OrderAgent всё равно проверит курс
+        TaskDelayBody delayBody = new TaskDelayBody(taskId, shiftMinutes, "Начало приготовления");
+        dispatchAndProcess(MessageType.TASK_DELAY_EVENT, delayBody);
+
         eventPublisher.publishEvent(new CookingTaskUpdatedEvent(this, task.getAssignedCook().getId()));
-        log.debug("SchedulerService: задача #{} → IN_PROGRESS", taskId);
     }
 
     /**
@@ -256,6 +277,7 @@ public class SchedulerService {
 
         task.setStatus(CookingTaskStatus.DONE);
         task.setActualEndTime(actualEnd);
+        task.setLocalOverdue(false);
         cookingTaskRepository.save(task);
 
         log.info("SchedulerService: задача #{} → DONE (фактически в {})", taskId, actualEnd);
@@ -293,6 +315,7 @@ public class SchedulerService {
         }
         if (task.getPlannedEndTime() != null) {
             task.setPlannedEndTime(task.getPlannedEndTime().plusMinutes(delayMinutes));
+            task.setLocalOverdue(false);
         }
         cookingTaskRepository.save(task);
         log.info("SchedulerService: задача #{} задерживается на {} мин. Причина: {}",
@@ -315,12 +338,16 @@ public class SchedulerService {
      * @param cookProfileId ID профиля повара
      */
     public List<CookingTask> getTasksForCook(Long cookProfileId) {
-        List<CookingTask> tasks = cookingTaskRepository.findByAssignedCookIdAndStatusIn(
+        // Определяем начало сегодняшнего дня (00:00:00)
+        LocalDateTime startOfDay = LocalDateTime.now().with(LocalTime.MIN);
+
+        // Используем наш новый метод репозитория
+        List<CookingTask> tasks = cookingTaskRepository.findActiveAndRecentlyDoneTasks(
                 cookProfileId,
-                // ИСПРАВЛЕНИЕ: Добавили CookingTaskStatus.DONE в список
-                List.of(CookingTaskStatus.PLANNED, CookingTaskStatus.IN_PROGRESS, CookingTaskStatus.DONE)
+                startOfDay
         );
 
+        // Сортировка остается прежней: сначала то, что в работе, потом по времени
         return tasks.stream()
                 .sorted(Comparator
                         .comparingInt((CookingTask t) ->
@@ -343,23 +370,15 @@ public class SchedulerService {
     }
 
     /**
-     * Автоматическое обнаружение задержек — каждую минуту.
-     *
-     * Проверяет два вида задержек:
-     *   1. Задачи IN_PROGRESS с просроченным plannedEndTime — повар не нажал «Готово»
-     *   2. Задачи PLANNED с просроченным plannedStartTime — повар не нажал «Начать»
-     *
-     * Для каждой такой задачи отправляет TASK_DELAY_EVENT на 1 минуту.
-     * Это сдвигает все последующие задачи этого повара и следующие курсы заказа.
-     *
-     * fixedDelay = 60_000: следующий запуск через 60 сек ПОСЛЕ окончания предыдущего,
-     * что гарантирует точность в 1 минуту без наложений.
+     * Автоматическое обнаружение задержек — строго в начале каждой минуты.
+     * Крон только фиксирует факт задержки в БД и публикует событие.
+     * Всю волну перепланирований берет на себя мультиагентная система.
      */
-    @Scheduled(fixedDelay = 60_000)
+    @Scheduled(cron = "0 * * * * *")
     @Transactional
     public void detectAndReportDelays() {
         LocalDateTime now = LocalDateTime.now();
-        boolean hasChanges = false; // <-- 1. Флаг для отслеживания изменений
+        boolean hasChanges = false;
 
         // 1. Задержки выполнения: IN_PROGRESS с просроченным endTime
         List<CookingTask> overdueExecution = cookingTaskRepository.findOverdueInProgressTasks(now);
@@ -372,15 +391,19 @@ public class SchedulerService {
                     int delayMinutes = (int) ChronoUnit.MINUTES.between(oldEndTime, now.plusMinutes(1));
                     if (delayMinutes <= 0) delayMinutes = 1;
 
+                    task.setLocalOverdue(true);
                     task.setPlannedEndTime(oldEndTime.plusMinutes(delayMinutes));
                     cookingTaskRepository.save(task);
 
-                    TaskDelayBody body = new TaskDelayBody(task.getId(), delayMinutes, "auto: задача просрочена на " + delayMinutes + " мин.");
+                    TaskDelayBody body = new TaskDelayBody(
+                            task.getId(), delayMinutes,
+                            "auto: задача просрочена на " + delayMinutes + " мин.");
                     dispatchAndProcess(MessageType.TASK_DELAY_EVENT, body);
 
-                    hasChanges = true; // <-- 2. Фиксируем изменение
+                    hasChanges = true;
                 } catch (Exception e) {
-                    log.error("SchedulerService: ошибка при обработке задержки задачи #{}: {}", task.getId(), e.getMessage(), e);
+                    log.error("SchedulerService: ошибка при обработке задержки задачи #{}: {}",
+                            task.getId(), e.getMessage(), e);
                 }
             }
         }
@@ -396,21 +419,24 @@ public class SchedulerService {
                     int delayMinutes = (int) ChronoUnit.MINUTES.between(oldStartTime, now.plusMinutes(1));
                     if (delayMinutes <= 0) delayMinutes = 1;
 
+                    task.setLocalOverdue(true);
                     task.setPlannedStartTime(oldStartTime.plusMinutes(delayMinutes));
                     task.setPlannedEndTime(task.getPlannedEndTime().plusMinutes(delayMinutes));
                     cookingTaskRepository.save(task);
 
-                    TaskDelayBody body = new TaskDelayBody(task.getId(), delayMinutes, "auto: начало просрочено на " + delayMinutes + " мин.");
+                    TaskDelayBody body = new TaskDelayBody(
+                            task.getId(), delayMinutes,
+                            "auto: начало просрочено на " + delayMinutes + " мин.");
                     dispatchAndProcess(MessageType.TASK_DELAY_EVENT, body);
 
-                    hasChanges = true; // <-- 3. Фиксируем изменение
+                    hasChanges = true;
                 } catch (Exception e) {
-                    log.error("SchedulerService: ошибка при обработке задержки начала задачи #{}: {}", task.getId(), e.getMessage(), e);
+                    log.error("SchedulerService: ошибка при обработке задержки начала задачи #{}: {}",
+                            task.getId(), e.getMessage(), e);
                 }
             }
         }
 
-        // <-- 4. ЕСЛИ БЫЛИ СДВИГИ - ПУБЛИКУЕМ СОБЫТИЕ ДЛЯ WEBSOCKET -->
         if (hasChanges) {
             eventPublisher.publishEvent(new CookingTaskUpdatedEvent(this, null));
         }

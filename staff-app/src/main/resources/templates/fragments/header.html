@@ -27,7 +27,7 @@
                     </a>
 
                     <a th:href="@{/kds}"
-                       sec:authorize="hasAnyRole('COOK', 'ADMIN')"
+                       sec:authorize="hasAnyRole('COOK')"
                        class="nav-item-link">
                         <i class="fas fa-utensils"></i>
                         <span>KDS</span>
@@ -71,7 +71,10 @@
 
                     <a th:href="@{/profile}" class="profile-pill">
                         <div class="profile-info">
-                            <span class="u-name" sec:authentication="name">Username</span>
+                            <span class="u-name"
+                                  th:text="${currentEmployeeFullName != null ? currentEmployeeFullName : 'Сотрудник'}">
+                                ФИО
+                            </span>
                             <span class="u-role">
                                 <th:block sec:authorize="hasRole('ADMIN')">Администратор</th:block>
                                 <th:block sec:authorize="hasRole('COOK')">Повар</th:block>

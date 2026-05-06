@@ -58,12 +58,29 @@ public class CookingTaskDto {
             );
         }
 
-        boolean notDone = !"DONE".equals(dto.status) && !"CANCELLED".equals(dto.status);
-        // Обновляем логику флагов
-        // Теперь задача считается просроченной, если она сдвинута (totalDelayMinutes > 0)
-        // ИЛИ если она физически перешла границу текущего дедлайна (minutesLeft < 0)
-        dto.overdue = notDone && (dto.totalDelayMinutes > 0 || dto.minutesLeft < 0);
-        dto.urgent  = notDone && !dto.overdue && dto.minutesLeft <= 5;
+        boolean notDone = !"DONE".equals(dto.status) && !"CANCELLED".equals(dto.status) && !"FAILED".equals(dto.status);
+
+        if (notDone) {
+            LocalDateTime now = LocalDateTime.now();
+            boolean isCurrentlyOverdue = false;
+
+            // Мгновенная проверка (работает до того, как сработает фоновый крон)
+            if ("PLANNED".equals(dto.status) || "PENDING".equals(dto.status)) {
+                isCurrentlyOverdue = task.getPlannedStartTime() != null && now.isAfter(task.getPlannedStartTime());
+            } else if ("IN_PROGRESS".equals(dto.status)) {
+                isCurrentlyOverdue = task.getPlannedEndTime() != null && now.isAfter(task.getPlannedEndTime());
+            }
+
+            // Задача просрочена, если текущее время прямо сейчас больше планового
+            // ИЛИ если планировщик уже успел сдвинуть время и поставил флаг вины повара
+            dto.overdue = task.isLocalOverdue() || isCurrentlyOverdue;
+        } else {
+            dto.overdue = false;
+        }
+
+        // Если задача просрочена, она уже не считается просто "срочной"
+        dto.urgent = notDone && !dto.overdue && dto.minutesLeft <= 5 && dto.minutesLeft >= 0;
+
         return dto;
     }
 }

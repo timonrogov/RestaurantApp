@@ -36,8 +36,12 @@ public class SecurityConfig {
                 )
                 .formLogin(form -> form
                         .loginPage("/login")
-                        // Логику редиректа можно будет усложнить позже (повара -> на кухню, админа -> в заказы)
-                        .defaultSuccessUrl("/admin/orders", true)
+                        .successHandler((request, response, authentication) -> {
+                            // Поваров отправляем сразу на KDS, всех остальных — в заказы
+                            boolean isCook = authentication.getAuthorities().stream()
+                                    .anyMatch(a -> a.getAuthority().equals("ROLE_COOK"));
+                            response.sendRedirect(isCook ? "/kds" : "/admin/orders");
+                        })
                         .permitAll()
                 )
                 .logout(logout -> logout

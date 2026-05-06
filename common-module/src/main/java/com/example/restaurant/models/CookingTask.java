@@ -106,6 +106,14 @@ public class CookingTask {
     private LocalDateTime initialPlannedEndTime;
 
     /**
+     * Флаг локальной просрочки (по вине самого повара).
+     * Устанавливается в true автоматическим планировщиком, когда он сдвигает задачу
+     * из-за того, что повар вовремя не нажал "Начать" или "Готово".
+     */
+    @Column(name = "is_local_overdue", nullable = false, columnDefinition = "boolean default false")
+    private boolean localOverdue = false;
+
+    /**
      * Фактическое время начала.
      * Заполняется когда повар нажимает «Начать» на KDS-экране.
      */

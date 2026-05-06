@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- Папка, где будут лежать логи -->
+    <property name="LOG_PATH" value="./logs" />
+
+    <!-- 1. Настройка вывода в КОНСОЛЬ (стандартная) -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- 2. Настройка вывода в ФАЙЛ специально для планировщика -->
+    <appender name="SCHEDULER_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/scheduler.log</file>
+
+        <!-- Настройка ротации (чтобы файл не вырос до 100 Гб) -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- Создавать новый файл каждый день и хранить архивы 30 дней -->
+            <fileNamePattern>${LOG_PATH}/archived/scheduler-%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- 3. ГЛАВНОЕ: Направляем логи твоего пакета в отдельный файл -->
+    <!-- Замени "com.example.restaurant" на твой базовый пакет, если он другой -->
+    <logger name="com.example.restaurant.scheduler" level="DEBUG" additivity="false">
+        <appender-ref ref="CONSOLE" />
+        <appender-ref ref="SCHEDULER_FILE" />
+    </logger>
+
+    <!-- Все остальные логи системы (Spring, Hibernate) идут только в консоль -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE" />
+    </root>
+</configuration>

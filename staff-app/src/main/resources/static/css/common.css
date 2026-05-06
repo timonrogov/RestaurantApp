@@ -11,6 +11,7 @@
   --color5: #482813;
   --success: #28a745;
   --error: #dc3545;
+  --border-radius: 12px;
 }
 
 body {

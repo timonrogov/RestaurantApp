@@ -367,6 +367,26 @@ public class OrderService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Получение заказов для административной панели только за текущий день.
+     *
+     * @param statusFilter Фильтр по статусу (опционально)
+     * @return List<Order> заказы за сегодня с рассчитанными ценами
+     */
+    public List<Order> getOrdersForAdminPanelToday(OrderStatus statusFilter) {
+        LocalDate today = LocalDate.now();
+        return orderRepository.findOrdersForAdminToday(statusFilter, today).stream()
+                .peek(order -> {
+                    double total = pricingService.calculateTotal(order);
+                    order.getOrderItems().forEach(item -> item.setTotalPrice(
+                            item.getQuantity() * item.getDish().getPrice() *
+                                    (1 - item.getAppliedDiscount().doubleValue())
+                    ));
+                    order.setTotalPrice(total);
+                })
+                .collect(Collectors.toList());
+    }
+
 
 
 

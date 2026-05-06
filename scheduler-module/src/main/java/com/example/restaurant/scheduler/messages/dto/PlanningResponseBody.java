@@ -1,5 +1,7 @@
 package com.example.restaurant.scheduler.messages.dto;
 
+import lombok.ToString;
+
 import java.time.LocalDateTime;
 
 /**
@@ -10,6 +12,7 @@ import java.time.LocalDateTime;
  * Если success=false — слот не удалось зарезервировать (занят).
  *   TaskAgent должен попробовать следующий вариант из своего списка.
  */
+@ToString
 public class PlanningResponseBody {
 
     private final boolean success;

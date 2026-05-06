@@ -5,15 +5,9 @@ import com.example.restaurant.models.CookingTask;
 import com.example.restaurant.repositories.CookingTaskRepository;
 import com.example.restaurant.scheduler.messages.Message;
 import com.example.restaurant.scheduler.messages.MessageType;
-import com.example.restaurant.scheduler.messages.dto.EquipmentRequestBody;
-import com.example.restaurant.scheduler.messages.dto.EquipmentResponseBody;
-import com.example.restaurant.scheduler.messages.dto.ParamsRequestBody;
-import com.example.restaurant.scheduler.messages.dto.ParamsResponseBody;
-import com.example.restaurant.scheduler.messages.dto.PlacementVariant;
-import com.example.restaurant.scheduler.messages.dto.PlanningRequestBody;
-import com.example.restaurant.scheduler.messages.dto.PlanningResponseBody;
-import com.example.restaurant.scheduler.messages.dto.TaskPlannedBody;
+import com.example.restaurant.scheduler.messages.dto.*;
 import com.example.restaurant.scheduler.schedule.CookSchedule;
+import com.example.restaurant.enums.CookingTaskStatus;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -53,9 +47,9 @@ public class TaskAgent extends BaseAgent {
     private final String orderAgentId;
     private final SceneAgent sceneAgent; // прямая ссылка для чтения расписаний
     private final CookingTaskRepository taskRepository;
-    private final LocalDateTime notBefore;
-    private final LocalDateTime targetEndTime;
-    private final LocalDateTime deadline;
+    private LocalDateTime notBefore;
+    private LocalDateTime targetEndTime;
+    private LocalDateTime deadline;
 
     /** Нужно ли оборудование для этой задачи (кэшируем из template). */
     private final boolean equipmentNeeded;
@@ -102,18 +96,12 @@ public class TaskAgent extends BaseAgent {
     public TaskAgent(CookingTask task,
                      String orderAgentId,
                      SceneAgent sceneAgent,
-                     CookingTaskRepository taskRepository,
-                     LocalDateTime notBefore,
-                     LocalDateTime targetEndTime,
-                     LocalDateTime deadline) {
+                     CookingTaskRepository taskRepository) {
         super("TASK_" + task.getId());
         this.task = task;
         this.orderAgentId = orderAgentId;
         this.sceneAgent = sceneAgent;
         this.taskRepository = taskRepository;
-        this.notBefore = notBefore;
-        this.targetEndTime = targetEndTime;
-        this.deadline = deadline;
         this.equipmentNeeded = task.getTemplate().getRequiredEquipmentType() != null;
     }
 
@@ -124,12 +112,13 @@ public class TaskAgent extends BaseAgent {
     @Override
     protected void dispatch(Message message) {
         switch (message.getType()) {
-            case INIT                        -> startNegotiations();
+            case INIT                        -> handleInit(message);
             case AVAILABLE_COOKS_RESPONSE    -> handleAvailableCooksResponse(message);
             case PARAMS_RESPONSE             -> handleParamsResponse(message);
             case EQUIPMENT_RESPONSE          -> handleEquipmentResponse(message);
             case PLANNING_RESPONSE           -> handlePlanningResponse(message);
             case REMOVE_TASK                 -> handleRemoveTask(message);
+            case CANCEL_AND_REPLAN           -> handleCancelAndReplan(message);
             default -> log.warn("{}: получено неожиданное сообщение типа {}",
                     agentId, message.getType());
         }
@@ -156,6 +145,14 @@ public class TaskAgent extends BaseAgent {
 
         send(SceneAgent.AGENT_ID, MessageType.GET_AVAILABLE_COOKS,
                 task.getTemplate().getRequiredSpecialization());
+    }
+
+    private void handleInit(Message message) {
+        InitTaskPayload payload = (InitTaskPayload) message.getBody();
+        this.notBefore = payload.getNotBefore();
+        this.targetEndTime = payload.getTargetEndTime();
+        this.deadline = payload.getDeadline();
+        startNegotiations();
     }
 
     // -----------------------------------------------------------------------
@@ -645,6 +642,7 @@ public class TaskAgent extends BaseAgent {
         task.setAssignedCook(null);
         task.setAssignedEquipmentType(null);
         task.setReplanCount(replanCount);
+        task.setLocalOverdue(false);
         taskRepository.save(task);
 
         if (replanCount > MAX_REPLAN) {
@@ -658,6 +656,36 @@ public class TaskAgent extends BaseAgent {
 
         // Перезапускаем переговоры
         startNegotiations();
+    }
+
+    /**
+     * Обработать приказ на перепланирование от OrderAgent.
+     * Это системный сдвиг (из-за задержек соседей), поэтому мы снимаем
+     * старые брони, обновляем рамки и запускаем торги с чистого листа.
+     */
+    private void handleCancelAndReplan(Message message) {
+        log.info("{}: получен CANCEL_AND_REPLAN. Снимаем брони.", agentId);
+
+        if (task.getAssignedCook() != null) {
+            send("COOK_" + task.getAssignedCook().getId(), MessageType.FREE_SLOT, task.getId());
+        }
+        if (task.getAssignedEquipmentType() != null) {
+            send("EQUIPMENT_TYPE_" + task.getAssignedEquipmentType(), MessageType.FREE_SLOT, task.getId());
+        }
+
+        // Внутренний сброс состояния. БД обновит OrderAgent,
+        // чтобы избежать состояний гонки (Race Conditions).
+        task.setStatus(CookingTaskStatus.PENDING);
+        task.setPlannedStartTime(null);
+        task.setPlannedEndTime(null);
+        task.setAssignedCook(null);
+        task.setAssignedEquipmentType(null);
+        task.setLocalOverdue(false);
+        this.replanCount = 0;
+        task.setReplanCount(0);
+
+        // ВАЖНО: Мы НЕ вызываем startNegotiations() здесь.
+        // OrderAgent сам пришлет нам новый INIT, когда придет наша очередь!
     }
 
     // -----------------------------------------------------------------------

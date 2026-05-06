@@ -1,5 +1,7 @@
 package com.example.restaurant.scheduler.messages.dto;
 
+import lombok.ToString;
+
 import java.time.LocalDateTime;
 
 /**

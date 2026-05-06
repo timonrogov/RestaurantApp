@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -89,6 +90,21 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             "AND o.status != 'ASSEMBLY' " +
             "ORDER BY o.timeSlot.day.workDate DESC, o.timeSlot.orderTime DESC")
     List<Order> findOrdersForAdmin(@Param("status") OrderStatus status);
+
+    /**
+     * Находит заказы для административной панели только за указанный день.
+     * Используется для отображения заказов текущей смены.
+     *
+     * @param status фильтр по статусу (null = все статусы)
+     * @param today  дата рабочего дня
+     */
+    @Query("SELECT o FROM Order o WHERE " +
+            "( :status IS NULL OR o.status = :status ) " +
+            "AND o.status != 'ASSEMBLY' " +
+            "AND o.timeSlot.day.workDate = :today " +
+            "ORDER BY o.timeSlot.orderTime DESC")
+    List<Order> findOrdersForAdminToday(@Param("status") OrderStatus status,
+                                        @Param("today") LocalDate today);
 
 
     // Поиск корзины для авторизованного (как было, но с учетом null sessionToken для чистоты)

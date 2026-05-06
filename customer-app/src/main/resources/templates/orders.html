@@ -42,55 +42,72 @@
            class="filter-tab">Отмененные</a>
     </div>
 
-    <!-- 2. Список заказов -->
-    <div th:unless="${orders.isEmpty()}" class="orders-grid">
-        <div th:each="order : ${orders}"
-             class="order-card-item"
-             th:attr="data-order-id=${order.id},
-               data-order-active=${order.status.name() != 'SERVED' and order.status.name() != 'CANCELED'}">
+    <!-- ======================================================
+     2. Список заказов
+     Два режима:
+       - groupedMode=true  → секции «Сегодня» / «Ранее»
+       - groupedMode=false → обычный плоский список
+     ====================================================== -->
 
-            <div class="card-header">
-                <span class="order-number">№ <span th:text="${order.id}"></span></span>
-                <!-- Бейдж статуса -->
-                <span class="status-badge"
-                      th:classappend="'status-' + ${order.status.name().toLowerCase()}"
-                      th:text="${order.status.getDisplayName()}">
-        </span>
+    <!-- === РЕЖИМ С ГРУППИРОВКОЙ (вкладка «Все») === -->
+    <th:block th:if="${groupedMode}">
+
+        <!-- Секция «Сегодня» -->
+        <div th:if="${!todayOrders.isEmpty()}" class="orders-section">
+            <div class="section-divider">
+                <i class="far fa-calendar-check"></i> Сегодня
             </div>
-
-            <div class="card-body">
-                <div class="info-row">
-                    <i class="far fa-calendar-alt"></i>
-                    <span th:text="${#temporals.format(order.timeSlot.day.workDate, 'dd.MM.yyyy')}"></span>
+            <div class="orders-grid">
+                <div th:each="order : ${todayOrders}"
+                     class="order-card-item"
+                     th:attr="data-order-id=${order.id},
+                   data-order-active=${order.status.name() != 'SERVED' and order.status.name() != 'CANCELED'}">
+                    <th:block th:replace="~{::order-card-fragment(ord=${order})}"></th:block>
                 </div>
-                <div class="info-row">
-                    <i class="far fa-clock"></i>
-                    <span th:text="${#temporals.format(order.timeSlot.orderTime, 'HH:mm')}"></span>
-                </div>
-                <div class="info-row" th:if="${order.tableNumber != '0'}">
-                    <i class="fas fa-utensils"></i>
-                    <span>Столик №<span th:text="${order.tableNumber}"></span></span>
-                </div>
-                <div class="order-total-preview">
-                    <span>Сумма:</span>
-                    <strong th:text="${#numbers.formatDecimal(order.totalPrice, 1, 0)} + ' ₽'"></strong>
-                </div>
-            </div>
-
-            <div class="card-footer">
-                <a th:href="@{/orders/details/{id}(id=${order.id})}" class="btn btn-primary btn-full">
-                    Подробнее <i class="fas fa-chevron-right" style="font-size: 0.8rem; margin-left: 5px;"></i>
-                </a>
             </div>
         </div>
-    </div>
 
-    <!-- 3. Сообщение, если заказов нет -->
-    <div th:if="${orders.isEmpty()}" class="empty-state">
-        <div class="empty-icon"><i class="fas fa-receipt"></i></div>
-        <p>Заказов с таким статусом не найдено</p>
-        <a th:href="@{/menu}" class="btn btn-primary">Сделать заказ</a>
-    </div>
+        <!-- Секция «Ранее» -->
+        <div th:if="${!pastOrders.isEmpty()}" class="orders-section">
+            <div class="section-divider section-divider--past">
+                <i class="far fa-calendar-alt"></i> Ранее
+            </div>
+            <div class="orders-grid">
+                <div th:each="order : ${pastOrders}"
+                     class="order-card-item"
+                     th:attr="data-order-id=${order.id},
+                   data-order-active=${order.status.name() != 'SERVED' and order.status.name() != 'CANCELED'}">
+                    <th:block th:replace="~{::order-card-fragment(ord=${order})}"></th:block>
+                </div>
+            </div>
+        </div>
+
+        <!-- Пустое состояние (история пуста) -->
+        <div th:if="${todayOrders.isEmpty() and pastOrders.isEmpty()}" class="empty-state">
+            <div class="empty-icon"><i class="fas fa-receipt"></i></div>
+            <p>У вас пока нет заказов</p>
+            <a th:href="@{/menu}" class="btn btn-primary">Сделать заказ</a>
+        </div>
+
+    </th:block>
+
+    <!-- === ОБЫЧНЫЙ РЕЖИМ (фильтр по статусу) === -->
+    <th:block th:unless="${groupedMode}">
+        <div th:unless="${orders.isEmpty()}" class="orders-grid">
+            <div th:each="order : ${orders}"
+                 class="order-card-item"
+                 th:attr="data-order-id=${order.id},
+               data-order-active=${order.status.name() != 'SERVED' and order.status.name() != 'CANCELED'}">
+                <th:block th:replace="~{::order-card-fragment(ord=${order})}"></th:block>
+            </div>
+        </div>
+
+        <div th:if="${orders.isEmpty()}" class="empty-state">
+            <div class="empty-icon"><i class="fas fa-receipt"></i></div>
+            <p>Заказов с таким статусом не найдено</p>
+            <a th:href="@{/menu}" class="btn btn-primary">Сделать заказ</a>
+        </div>
+    </th:block>
 
     <!-- 4. Нижняя навигация -->
     <div class="bottom-nav">
@@ -99,6 +116,45 @@
         </a>
     </div>
 </div>
+
+<!-- Переиспользуемый фрагмент карточки заказа -->
+<!-- Оборачиваем фрагмент, чтобы он не выполнялся как самостоятельный HTML-код внизу страницы -->
+<th:block th:if="${false}">
+
+    <!-- Переиспользуемый фрагмент карточки заказа -->
+    <th:block th:fragment="order-card-fragment(ord)">
+        <div class="card-header">
+            <span class="order-number">№ <span th:text="${ord.id}"></span></span>
+            <span class="status-badge"
+                  th:classappend="'status-' + ${ord.status.name().toLowerCase()}"
+                  th:text="${ord.status.getDisplayName()}"></span>
+        </div>
+        <div class="card-body">
+            <div class="info-row">
+                <i class="far fa-calendar-alt"></i>
+                <span th:text="${#temporals.format(ord.timeSlot.day.workDate, 'dd.MM.yyyy')}"></span>
+            </div>
+            <div class="info-row">
+                <i class="far fa-clock"></i>
+                <span th:text="${#temporals.format(ord.timeSlot.orderTime, 'HH:mm')}"></span>
+            </div>
+            <div class="info-row" th:if="${ord.tableNumber != '0'}">
+                <i class="fas fa-utensils"></i>
+                <span>Столик №<span th:text="${ord.tableNumber}"></span></span>
+            </div>
+            <div class="order-total-preview">
+                <span>Сумма:</span>
+                <strong th:text="${#numbers.formatDecimal(ord.totalPrice, 1, 0)} + ' ₽'"></strong>
+            </div>
+        </div>
+        <div class="card-footer">
+            <a th:href="@{/orders/details/{id}(id=${ord.id})}" class="btn btn-primary btn-full">
+                Подробнее <i class="fas fa-chevron-right" style="font-size: 0.8rem; margin-left: 5px;"></i>
+            </a>
+        </div>
+    </th:block>
+
+</th:block>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>

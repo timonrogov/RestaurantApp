@@ -165,7 +165,19 @@
 
             // Подписываемся на топик KDS — придёт сигнал когда задачи изменятся
             stompClient.subscribe('/topic/kds', function (message) {
-                loadTasks(); // Загружаем актуальные данные через REST
+                try {
+                    const data = JSON.parse(message.body);
+                    if (data.type === 'ORDER_SERVED') {
+                        // Удаляем только карточки этого заказа из колонки "Готово"
+                        removeDoneCardsByOrderId(data.orderId);
+                    } else {
+                        // Любое другое обновление — перезагружаем задачи полностью
+                        loadTasks();
+                    }
+                } catch (e) {
+                    // Если JSON не парсится — просто обновляем
+                    loadTasks();
+                }
             });
 
             // Первая загрузка задач
@@ -218,6 +230,37 @@
         tasks.forEach(task => col.appendChild(buildCard(task, type)));
     }
 
+    /**
+     * Удаляет карточки указанного заказа из колонки «Готово».
+     * Вызывается при получении сигнала ORDER_SERVED по WebSocket —
+     * без повторного запроса к серверу.
+     *
+     * @param {number} orderId — ID заказа, задачи которого нужно убрать
+     */
+    function removeDoneCardsByOrderId(orderId) {
+        const doneCol = document.getElementById('col-done');
+        if (!doneCol) return;
+
+        // Находим все карточки в колонке «Готово» с совпадающим orderId
+        const toRemove = Array.from(doneCol.querySelectorAll('.kds-card'))
+                .filter(card => String(card.dataset.orderId) === String(orderId));
+
+        toRemove.forEach(card => doneCol.removeChild(card));
+
+        // Обновляем счётчик колонки «Готово»
+        const remaining = doneCol.querySelectorAll('.kds-card').length;
+        document.getElementById('col-count-done').textContent = remaining;
+        document.getElementById('cnt-done').textContent = remaining;
+
+        // Показываем заглушку «пусто», если больше нет карточек
+        const emptyDone = document.getElementById('empty-done');
+        if (emptyDone) emptyDone.style.display = remaining === 0 ? 'block' : 'none';
+
+        if (toRemove.length > 0) {
+            showToast('Заказ подан — задачи убраны с KDS');
+        }
+    }
+
     function buildCard(task, colType) {
         const div = document.createElement('div');
         const cls = ['kds-card'];
@@ -225,17 +268,28 @@
         else if (task.urgent) cls.push('is-urgent');
         if (task.status === 'DONE') cls.push('is-done');
         div.className = cls.join(' ');
+        div.dataset.orderId = task.orderId;
 
         let badges = '';
 
-        // === ИСПРАВЛЕНИЕ: НОВАЯ ЛОГИКА ОТОБРАЖЕНИЯ БЕЙДЖЕЙ ===
+        // === НОВАЯ ЛОГИКА ОТОБРАЖЕНИЯ БЕЙДЖЕЙ ===
+        /*Для диплома: В системе реализовано разделение ответственности (Responsibility Segregation)
+        на уровне пользовательского интерфейса. Система отличает системные сдвиги расписания (chain delay)
+        от локальных просрочек (local overdue). Это позволяет избежать эффекта «усталости от тревог»
+        у линейного персонала, фокусируя их внимание только на тех задачах, где они выступают
+        «бутылочным горлышком» в данный момент времени.*/
         if (task.status !== 'DONE' && task.status !== 'CANCELLED') {
+
+            // 1. Информационный бейдж: Задача сдвинута системой (Яшин не виноват)
             if (task.totalDelayMinutes > 0) {
-                // Наша новая крутая надпись!
-                badges += `<span class="kds-badge overdue"><i class="fas fa-exclamation-circle"></i> Задержка! (сдвиг на ${task.totalDelayMinutes} мин.)</span>`;
-            } else if (task.minutesLeft < 0) {
-                // На случай если мы еще не успели перепланировать (до срабатывания крона)
-                badges += `<span class="kds-badge overdue"><i class="fas fa-exclamation-circle"></i> Задержка</span>`;
+                // Спокойный цвет (как фон страницы), не привлекающий панику
+                badges += `<span class="kds-badge" style="background: var(--color1); color: var(--color4); border: 1px solid var(--color2);"><i class="fas fa-info-circle"></i> Сдвиг: ${task.totalDelayMinutes} мин.</span>`;
+            }
+
+            // 2. Критичный бейдж: Виноват сам повар ПРЯМО СЕЙЧАС
+            if (task.overdue) {
+                // Вот это вызовет красный цвет!
+                badges += `<span class="kds-badge overdue"><i class="fas fa-exclamation-circle"></i> Опаздываем!</span>`;
             } else if (task.urgent) {
                 badges += `<span class="kds-badge urgent"><i class="fas fa-bolt"></i> Срочно</span>`;
             }
@@ -283,7 +337,7 @@
             <div class="kds-card-header">
                 <div class="kds-order-info">
                     <span class="kds-order-num">#${task.orderId}</span>
-                    <span class="kds-table-badge"><i class="fas fa-chair"></i> ${esc(task.tableNumber)}</span>
+                    <span class="kds-table-badge"><i class="fas fa-table-cells"></i> ${esc(task.tableNumber)}</span>
                     ${course}
                 </div>
                 <div class="kds-status-badges">${badges}</div>

@@ -1,5 +1,7 @@
 package com.example.restaurant.scheduler.messages.dto;
 
+import lombok.ToString;
+
 import java.util.List;
 
 /**
@@ -10,6 +12,7 @@ import java.util.List;
  * Может содержать 0–3 варианта: asap, jit, conflict (в любой комбинации).
  * Пустой список означает, что у повара нет ни одного подходящего варианта.
  */
+@ToString
 public class ParamsResponseBody {
 
     /** ID задачи, на которую отвечает повар (зеркало из запроса). */

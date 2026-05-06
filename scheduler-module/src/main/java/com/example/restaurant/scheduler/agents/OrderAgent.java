@@ -11,7 +11,10 @@ import com.example.restaurant.repositories.CookingTaskTemplateRepository;
 import com.example.restaurant.repositories.OrderCourseRepository;
 import com.example.restaurant.scheduler.messages.Message;
 import com.example.restaurant.scheduler.messages.MessageType;
+import com.example.restaurant.scheduler.messages.dto.InitTaskPayload;
 import com.example.restaurant.scheduler.messages.dto.TaskPlannedBody;
+import com.example.restaurant.scheduler.messages.dto.TaskDelayBody;
+import com.example.restaurant.scheduler.messages.dto.CancelAndReplanBody;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -105,6 +108,7 @@ public class OrderAgent extends BaseAgent {
             case TASK_PLANNED     -> handleTaskPlanned(message);
             case TASK_FAILED      -> handleTaskFailed(message);
             case TASK_REPLANNING  -> handleTaskReplanning(message);
+            case TASK_DELAY_EVENT -> handleTaskDelayEvent(message);
             default -> log.warn("{}: получено неожиданное сообщение типа {}",
                     agentId, message.getType());
         }
@@ -226,253 +230,256 @@ public class OrderAgent extends BaseAgent {
     // Фаза 2: планирование текущего курса
     // -----------------------------------------------------------------------
 
-    /**
-     * Запустить планирование текущего курса.
-     *
-     * Вычисляет notBefore для задач курса:
-     *   - курс 1: прямо сейчас
-     *   - курс N: конец курса N-1 + syncGapMinutes
-     *
-     * Создаёт TaskAgent для каждой задачи курса и отправляет им INIT.
-     */
-    private void planCurrentCourse() {
-        CourseState current = courseStates.get(currentCourseIndex);
-        log.info("{}: запуск планирования курса {} ({} задач)",
-                agentId, current.courseNumber, current.taskIds.size());
+    private static class CourseTimeParams {
+        final LocalDateTime notBefore;
+        LocalDateTime targetEndTime; // Не final, так как можем корректировать
+        LocalDateTime deadline;
 
-        if (current.taskIds.isEmpty()) {
-            log.warn("{}: курс {} не содержит задач, переходим к следующему", agentId, current.courseNumber);
-            onCourseCompleted();
-            return;
+        CourseTimeParams(LocalDateTime notBefore, LocalDateTime targetEndTime, LocalDateTime deadline) {
+            this.notBefore = notBefore;
+            this.targetEndTime = targetEndTime;
+            this.deadline = deadline;
+        }
+    }
+
+    private CourseTimeParams calculateCourseTimes(int courseIndex) {
+        CourseState current = courseStates.get(courseIndex);
+        List<CookingTask> tasks = taskRepository.findAllById(current.taskIds);
+        int maxDuration = tasks.stream().mapToInt(t -> t.getTemplate().getDurationMinutes()).max().orElse(0);
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime notBefore;
+        LocalDateTime targetEndTime;
+
+        // 1. Актуализируем время текущего курса (вдруг кто-то уже начал работу)
+        recalculateLatestPlannedEnd(current);
+
+        if (courseIndex == 0) {
+            // --- ДЛЯ ПЕРВОГО КУРСА ---
+            if (current.latestPlannedEnd != null && current.latestPlannedEnd.isAfter(now)) {
+                // ИСПРАВЛЕНИЕ: Если кто-то УЖЕ начал готовить первый курс,
+                // весь курс выравнивается по нему! (никаких слепых +1 минута)
+                targetEndTime = current.latestPlannedEnd;
+                notBefore = targetEndTime.minusMinutes(maxDuration);
+                if (notBefore.isBefore(now)) notBefore = now;
+            } else {
+                // Никто еще не начал - планируем от текущего момента
+                notBefore = now.plusMinutes(1);
+                targetEndTime = now.plusMinutes(1 + maxDuration);
+            }
+        } else {
+            // --- ДЛЯ ОСТАЛЬНЫХ КУРСОВ ---
+            CourseState previous = courseStates.get(courseIndex - 1);
+            recalculateLatestPlannedEnd(previous);
+            LocalDateTime prevEnd = previous.latestPlannedEnd != null ? previous.latestPlannedEnd : now;
+
+            // Базовый расчет от предыдущего курса
+            targetEndTime = prevEnd.plusMinutes(current.syncGapMinutes);
+            notBefore = targetEndTime.minusMinutes(maxDuration);
+
+            // Защита от "прошлого"
+            if (notBefore.isBefore(now)) {
+                notBefore = now;
+                targetEndTime = now.plusMinutes(maxDuration);
+            }
+
+            // ИСПРАВЛЕНИЕ: Если мы перепланируем курс, в котором УЖЕ есть начатые задачи,
+            // их время окончания приоритетнее, чем время, рассчитанное от предыдущего курса!
+            if (current.latestPlannedEnd != null && current.latestPlannedEnd.isAfter(targetEndTime)) {
+                targetEndTime = current.latestPlannedEnd;
+                notBefore = targetEndTime.minusMinutes(maxDuration);
+                if (notBefore.isBefore(now)) notBefore = now;
+            }
         }
 
-        LocalDateTime notBefore = computeNotBefore(current);
-        LocalDateTime deadline = notBefore.plusMinutes(PLANNING_HORIZON_MINUTES);
+        LocalDateTime deadline = targetEndTime.plusMinutes(PLANNING_HORIZON_MINUTES);
+        return new CourseTimeParams(notBefore, targetEndTime, deadline);
+    }
+
+    private void planCurrentCourse() {
+        if (currentCourseIndex >= courseStates.size()) return;
+        CourseState current = courseStates.get(currentCourseIndex);
+
+        log.info("{}: запуск планирования курса {} ({} задач)", agentId, current.courseNumber, current.taskIds.size());
 
         List<CookingTask> tasks = taskRepository.findAllById(current.taskIds);
 
-        int maxDuration = tasks.stream()
-                .mapToInt(t -> t.getTemplate().getDurationMinutes())
-                .max()
-                .orElse(0);
-
-        LocalDateTime targetEndTime = notBefore.plusMinutes(maxDuration);
-        log.debug("{}: курс {}, notBefore={}, targetEndTime={}, deadline={}",
-                agentId, current.courseNumber, notBefore, targetEndTime, deadline);
-
-        // 1. Сортируем задачи по убыванию длительности
-        List<CookingTask> sortedTasks = tasks.stream()
-                .sorted(Comparator.comparingInt((CookingTask t) ->
-                        t.getTemplate().getDurationMinutes()).reversed())
+        // Берем только те задачи, которые нуждаются в планировании
+        List<CookingTask> tasksToPlan = tasks.stream()
+                .filter(t -> t.getStatus() == CookingTaskStatus.PENDING || t.getStatus() == CookingTaskStatus.FAILED)
+                .sorted(Comparator.comparingInt((CookingTask t) -> t.getTemplate().getDurationMinutes()).reversed())
                 .toList();
 
-        // 2. Сохраняем отсортированную очередь в состояние курса
-        current.sortedTaskIdsToPlan = sortedTasks.stream().map(CookingTask::getId).toList();
+        current.sortedTaskIdsToPlan = new ArrayList<>(tasksToPlan.stream().map(CookingTask::getId).toList());
         current.currentTaskIndex = 0;
 
-        // 3. Создаем и регистрируем ВСЕХ агентов, НО НЕ запускаем их (не шлем INIT)
-        for (CookingTask task : sortedTasks) {
-            TaskAgent taskAgent = new TaskAgent(
-                    task, agentId, sceneAgent, taskRepository,
-                    notBefore, targetEndTime, deadline
-            );
-            messageBus.register(taskAgent);
-            taskIdToAgentId.put(task.getId(), taskAgent.getAgentId());
+        // Актуализируем список уже запланированных задач (если это перепланирование)
+        current.plannedTaskIds.clear();
+        for (CookingTask t : tasks) {
+            if (t.getStatus() != CookingTaskStatus.PENDING && t.getStatus() != CookingTaskStatus.FAILED && t.getStatus() != CookingTaskStatus.CANCELLED) {
+                current.plannedTaskIds.add(t.getId());
+            }
+        }
+        recalculateLatestPlannedEnd(current);
+
+        if (current.sortedTaskIdsToPlan.isEmpty()) {
+            checkCourseCompletion(current);
+            return;
         }
 
-        // 4. Запускаем ТОЛЬКО первого агента из очереди
-        planNextTaskInCurrentCourse();
+        // Регистрируем новых агентов (если они еще не созданы)
+        for (CookingTask task : tasksToPlan) {
+            if (!taskIdToAgentId.containsKey(task.getId())) {
+                TaskAgent taskAgent = new TaskAgent(task, agentId, sceneAgent, taskRepository);
+                messageBus.register(taskAgent);
+                taskIdToAgentId.put(task.getId(), taskAgent.getAgentId());
+            }
+        }
+
+        planNextTaskInCurrentCourse(current);
     }
 
     /**
      * Запускает следующую по очереди задачу в текущем курсе.
      * Вызывается на старте курса и после завершения планирования каждой задачи.
      */
-    private void planNextTaskInCurrentCourse() {
-        CourseState current = courseStates.get(currentCourseIndex);
-        if (current.currentTaskIndex < current.sortedTaskIdsToPlan.size()) {
-            long nextTaskId = current.sortedTaskIdsToPlan.get(current.currentTaskIndex);
-            current.currentTaskIndex++;
+    private void planNextTaskInCurrentCourse(CourseState course) {
+        if (course.currentTaskIndex < course.sortedTaskIdsToPlan.size()) {
+            long nextTaskId = course.sortedTaskIdsToPlan.get(course.currentTaskIndex);
+            course.currentTaskIndex++;
 
+            CourseTimeParams times = calculateCourseTimes(courseStates.indexOf(course));
+
+            // МАГИЯ JIT: Если в курсе уже есть начатые задачи (IN_PROGRESS),
+            // мы должны ориентироваться на них.
+            recalculateLatestPlannedEnd(course);
+
+            // Если кто-то в этом курсе УЖЕ готовится, то targetEndTime для
+            // остальных задач курса должен быть ТАКИМ ЖЕ, как у него.
+            if (course.latestPlannedEnd != null) {
+                times.targetEndTime = course.latestPlannedEnd;
+            }
+
+            InitTaskPayload payload = new InitTaskPayload(times.notBefore, times.targetEndTime, times.deadline);
             String taskAgentId = taskIdToAgentId.get(nextTaskId);
-            send(taskAgentId, MessageType.INIT, null);
 
-            log.debug("{}: отправлен INIT агенту {} (по очереди {} из {})",
-                    agentId, taskAgentId, current.currentTaskIndex, current.sortedTaskIdsToPlan.size());
+            log.debug("{}: отправлен INIT агенту {} (target={})", agentId, taskAgentId, times.targetEndTime);
+            send(taskAgentId, MessageType.INIT, payload);
+        } else {
+            checkCourseCompletion(course);
         }
-    }
-
-    /**
-     * Вычислить notBefore для задач курса.
-     *
-     * Для первого курса — текущее время.
-     * Для остальных — конец предыдущего курса + пауза.
-     * Если предыдущий курс ещё не завершился (нет latestPlannedEnd) — тоже текущее время.
-     */
-    private LocalDateTime computeNotBefore(CourseState current) {
-        if (currentCourseIndex == 0) {
-            return LocalDateTime.now();
-        }
-
-        CourseState previous = courseStates.get(currentCourseIndex - 1);
-        if (previous.latestPlannedEnd == null) {
-            log.warn("{}: предыдущий курс не имеет latestPlannedEnd, используем now()", agentId);
-            return LocalDateTime.now();
-        }
-
-        return previous.latestPlannedEnd.plusMinutes(current.syncGapMinutes);
     }
 
     // -----------------------------------------------------------------------
     // Фаза 3: отслеживание результатов
     // -----------------------------------------------------------------------
 
-    /**
-     * Задача успешно запланирована.
-     *
-     * Обновляет latestPlannedEnd курса (берём максимум — самая поздняя задача
-     * определяет когда весь курс будет готов). Проверяет завершённость курса.
-     *
-     * @param message тело: {@link TaskPlannedBody}
-     */
     private void handleTaskPlanned(Message message) {
         TaskPlannedBody body = (TaskPlannedBody) message.getBody();
         long taskId = body.getTaskId();
         LocalDateTime confirmedEnd = body.getConfirmedEnd();
 
         CourseState courseState = findCourseStateByTaskId(taskId);
-        if (courseState == null) {
-            log.warn("{}: TASK_PLANNED для задачи #{}, но курс не найден", agentId, taskId);
-            return;
-        }
+        if (courseState == null) return;
 
+        // Фиксируем задачу
         courseState.markPlanned(taskId, confirmedEnd);
 
-        log.info("{}: задача #{} запланирована до {}. Курс {}: {}/{} задач завершено.",
-                agentId, taskId, confirmedEnd,
-                courseState.courseNumber,
-                courseState.plannedTaskIds.size() + courseState.failedTaskIds.size(),
-                courseState.taskIds.size());
+        // Получаем актуальные рамки (calculateCourseTimes уже учел confirmedEnd как новый максимум)
+        CourseTimeParams times = calculateCourseTimes(courseStates.indexOf(courseState));
 
-        boolean isCourseCompleted = checkCourseCompletion(courseState);
-        if (!isCourseCompleted) {
-            // Если курс еще не завершен, запускаем планирование следующей задачи!
-            planNextTaskInCurrentCourse();
+        // ЖЕЛЕЗОБЕТОННОЕ ВЫРАВНИВАНИЕ JIT:
+        // Ищем в курсе задачи, которые УЖЕ запланированы, но их конец РАНЬШЕ, чем новая цель!
+        // Это значит, что они приготовятся слишком рано и остынут. Их нужно сдвинуть вправо.
+        List<Long> tasksToReplan = new ArrayList<>();
+        for (Long plannedId : courseState.plannedTaskIds) {
+            if (plannedId != taskId) {
+                CookingTask pt = taskRepository.findById(plannedId).orElse(null);
+                // Если задача заканчивается раньше цели хотя бы на 30 секунд
+                if (pt != null && pt.getPlannedEndTime() != null &&
+                        pt.getPlannedEndTime().isBefore(times.targetEndTime.minusSeconds(30))) {
+                    tasksToReplan.add(plannedId);
+                }
+            }
+        }
+
+        if (!tasksToReplan.isEmpty()) {
+            log.info("{}: задача {} задала новый дедлайн {}. Выравниваем {} старых задач.",
+                    agentId, taskId, times.targetEndTime, tasksToReplan.size());
+
+            for (Long idToReplan : tasksToReplan) {
+                String taId = taskIdToAgentId.get(idToReplan);
+                if (taId != null) {
+                    CancelAndReplanBody payload = new CancelAndReplanBody(
+                            idToReplan, times.notBefore, times.targetEndTime, times.deadline
+                    );
+                    send(taId, MessageType.CANCEL_AND_REPLAN, payload);
+                }
+
+                // Сбрасываем в БД
+                CookingTask pt = taskRepository.findById(idToReplan).orElseThrow();
+                pt.setStatus(CookingTaskStatus.PENDING);
+                pt.setPlannedStartTime(null);
+                pt.setPlannedEndTime(null);
+                pt.setAssignedCook(null);
+                pt.setAssignedEquipmentType(null);
+                taskRepository.save(pt);
+
+                // Возвращаем в очередь планирования
+                courseState.plannedTaskIds.remove(idToReplan);
+                if (!courseState.sortedTaskIdsToPlan.contains(idToReplan)) {
+                    courseState.sortedTaskIdsToPlan.add(idToReplan);
+                }
+            }
+        }
+
+        if (!checkCourseCompletion(courseState)) {
+            planNextTaskInCurrentCourse(courseState);
         }
     }
 
-    /**
-     * Задача провалила планирование.
-     *
-     * Логируем предупреждение. Провалившаяся задача не блокирует весь заказ:
-     * остальные блюда будут приготовлены, просто это блюдо (или его этап) — нет.
-     * Проверяем завершённость курса.
-     *
-     * @param message тело: {@code Long taskId}
-     */
     private void handleTaskFailed(Message message) {
         long taskId = (Long) message.getBody();
-
         CourseState courseState = findCourseStateByTaskId(taskId);
-        if (courseState == null) {
-            log.warn("{}: TASK_FAILED для задачи #{}, но курс не найден", agentId, taskId);
-            return;
-        }
+        if (courseState == null) return;
 
         courseState.markFailed(taskId);
-
-        log.warn("{}: задача #{} провалила планирование! Курс {}: {}/{} задач завершено.",
-                agentId, taskId,
-                courseState.courseNumber,
-                courseState.plannedTaskIds.size() + courseState.failedTaskIds.size(),
-                courseState.taskIds.size());
-
-        boolean isCourseCompleted = checkCourseCompletion(courseState);
-        if (!isCourseCompleted) {
-            // Если курс еще не завершен, запускаем планирование следующей задачи!
-            planNextTaskInCurrentCourse();
+        if (!checkCourseCompletion(courseState)) {
+            planNextTaskInCurrentCourse(courseState);
         }
     }
 
-    /**
-     * Задача перепланируется из-за вытеснения.
-     *
-     * Убираем задачу из plannedTaskIds если она там была
-     * (задача могла быть запланирована, потом вытеснена).
-     * latestPlannedEnd будет пересчитан при следующем TASK_PLANNED.
-     *
-     * @param message тело: {@code Long taskId}
-     */
     private void handleTaskReplanning(Message message) {
-        long taskId = (Long) message.getBody();
-
-        CourseState courseState = findCourseStateByTaskId(taskId);
-        if (courseState == null) {
-            log.warn("{}: TASK_REPLANNING для задачи #{}, но курс не найден", agentId, taskId);
-            return;
-        }
-
-        boolean wasPlanned = courseState.plannedTaskIds.remove(taskId);
-
-        if (wasPlanned) {
-            // Задача была запланирована, теперь перепланируется.
-            // latestPlannedEnd мог опираться на эту задачу — пересчитываем.
-            recalculateLatestPlannedEnd(courseState);
-            log.info("{}: задача #{} убрана из планов курса {}, пересчитываем latestPlannedEnd={}",
-                    agentId, taskId, courseState.courseNumber, courseState.latestPlannedEnd);
-        } else {
-            log.debug("{}: задача #{} перепланируется (ещё не была в planned)", agentId, taskId);
-        }
+        // Мы переписали механизм перепланирования (handleTaskDelayEvent),
+        // поэтому TaskAgent больше не присылает TASK_REPLANNING.
+        // Оставляем пустой метод или логируем для отладки.
     }
+
 
     // -----------------------------------------------------------------------
     // Завершение курса
     // -----------------------------------------------------------------------
 
-    /**
-     * Проверить: завершён ли текущий курс?
-     * Курс считается завершённым когда каждая его задача либо запланирована,
-     * либо провалилась (т.е. ответ получен от всех).
-     */
-    private boolean checkCourseCompletion(CourseState courseState) { // Изменили void на boolean
+    private boolean checkCourseCompletion(CourseState courseState) {
         int resolved = courseState.plannedTaskIds.size() + courseState.failedTaskIds.size();
-        int total = courseState.taskIds.size();
-
-        if (resolved >= total) {
-            log.info("{}: курс {} завершён. Запланировано: {}, провалено: {}.",
-                    agentId, courseState.courseNumber,
-                    courseState.plannedTaskIds.size(), courseState.failedTaskIds.size());
+        if (resolved >= courseState.taskIds.size()) {
             onCourseCompleted();
-            return true; // Курс завершен
+            return true;
         }
-        return false; // Курс еще в процессе
+        return false;
     }
 
-    /**
-     * Текущий курс завершён — запустить следующий или уведомить о полном завершении.
-     */
     private void onCourseCompleted() {
-        // Снимаем с регистрации TaskAgent-ов завершённого курса
-        /*CourseState completedCourse = courseStates.get(currentCourseIndex);
-        unregisterTaskAgentsForCourse(completedCourse);*/
-
         currentCourseIndex++;
-
         if (currentCourseIndex < courseStates.size()) {
-            // Есть ещё курсы — запускаем следующий
-            log.info("{}: переход к курсу {}", agentId, currentCourseIndex + 1);
             planCurrentCourse();
         } else {
-            // Все курсы пройдены
             notifyAllTasksPlanned();
         }
     }
 
-    /**
-     * Уведомить DispatcherAgent что планирование заказа полностью завершено.
-     */
     private void notifyAllTasksPlanned() {
-        log.info("{}: все курсы заказа #{} запланированы. Уведомляем диспетчера.", agentId, order.getId());
+        log.info("{}: все курсы заказа #{} запланированы.", agentId, order.getId());
         send(DISPATCHER_AGENT_ID, MessageType.ALL_TASKS_PLANNED, order.getId());
     }
 
@@ -517,22 +524,83 @@ public class OrderAgent extends BaseAgent {
     }
 
     /**
-     * Пересчитать latestPlannedEnd курса после перепланирования задачи.
-     * Берём максимум confirmedEnd среди всех оставшихся запланированных задач курса.
+     * Надежный пересчет времени окончания курса с учетом всех актуальных задач.
      */
     private void recalculateLatestPlannedEnd(CourseState courseState) {
-        if (courseState.plannedTaskIds.isEmpty()) {
-            courseState.latestPlannedEnd = null;
-            return;
+        List<CookingTask> tasks = taskRepository.findAllById(courseState.taskIds);
+        LocalDateTime maxEnd = null;
+
+        for (CookingTask t : tasks) {
+            // Игнорируем только PENDING (они сейчас перепланируются и не имеют времени),
+            // а также отмененные и проваленные.
+            // PLANNED, IN_PROGRESS и DONE обязательно учитываем!
+            if (t.getStatus() == CookingTaskStatus.PENDING ||
+                    t.getStatus() == CookingTaskStatus.FAILED ||
+                    t.getStatus() == CookingTaskStatus.CANCELLED) {
+                continue;
+            }
+
+            LocalDateTime end = t.getActualEndTime() != null ? t.getActualEndTime() : t.getPlannedEndTime();
+            if (end != null) {
+                if (maxEnd == null || end.isAfter(maxEnd)) {
+                    maxEnd = end;
+                }
+            }
+        }
+        courseState.latestPlannedEnd = maxEnd;
+    }
+
+    // -----------------------------------------------------------------------
+    // Обработка задержек и системное перепланирование
+    // -----------------------------------------------------------------------
+
+    /**
+     * Реакция на задержку или досрочное завершение задачи.
+     * OrderAgent пересчитывает время для этого курса и заставляет все
+     * зависимые задачи (в этом и следующих курсах) провести новые торги.
+     */
+    private void handleTaskDelayEvent(Message message) {
+        TaskDelayBody body = (TaskDelayBody) message.getBody();
+        long taskId = body.getTaskId();
+
+        CourseState affectedCourse = findCourseStateByTaskId(taskId);
+        if (affectedCourse == null) return;
+
+        int startIndex = courseStates.indexOf(affectedCourse);
+        log.info("{}: сдвиг в курсе {}. Сбрасываем старые планы.", agentId, affectedCourse.courseNumber);
+
+        if (startIndex < currentCourseIndex) {
+            currentCourseIndex = startIndex;
         }
 
-        // Загружаем запланированные задачи и берём максимум plannedEndTime
-        courseState.latestPlannedEnd = taskRepository.findAll().stream()
-                .filter(t -> courseState.plannedTaskIds.contains(t.getId()))
-                .map(CookingTask::getPlannedEndTime)
-                .filter(t -> t != null)
-                .max(LocalDateTime::compareTo)
-                .orElse(null);
+        // ПРИНУДИТЕЛЬНО очищаем статусы в БД прямо здесь!
+        for (int i = startIndex; i < courseStates.size(); i++) {
+            CourseState cs = courseStates.get(i);
+            List<CookingTask> tasks = taskRepository.findAllById(cs.taskIds);
+
+            for (CookingTask t : tasks) {
+                // Сбрасываем только те, что еще не начали готовиться
+                if (t.getStatus() == CookingTaskStatus.PLANNED || t.getStatus() == CookingTaskStatus.PENDING) {
+
+                    // Уведомляем агента, чтобы он очистил память (RAM) у поваров
+                    String taId = taskIdToAgentId.get(t.getId());
+                    if (taId != null) {
+                        send(taId, MessageType.CANCEL_AND_REPLAN, null);
+                    }
+
+                    // ЖЕСТКО меняем статус в БД, чтобы planCurrentCourse их увидел
+                    t.setStatus(CookingTaskStatus.PENDING);
+                    t.setPlannedStartTime(null);
+                    t.setPlannedEndTime(null);
+                    t.setAssignedCook(null);
+                    t.setAssignedEquipmentType(null);
+                    taskRepository.save(t);
+                }
+            }
+        }
+
+        // Теперь вызываем планирование — теперь фильтр сработает правильно!
+        planCurrentCourse();
     }
 
     // -----------------------------------------------------------------------

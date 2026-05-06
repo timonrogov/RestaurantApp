@@ -187,6 +187,30 @@ h1 {
     100% { box-shadow: none; }
 }
 
+/* Разделители секций истории заказов */
+.orders-section {
+    margin-bottom: 2rem;
+}
+
+.section-divider {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--primary, #e67e22);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--primary, #e67e22);
+}
+
+.section-divider--past {
+    color: var(--text-muted, #888);
+    border-color: var(--border, #ddd);
+}
+
 /* === Адаптивность === */
 @media (max-width: 768px) {
     .quick-filters {

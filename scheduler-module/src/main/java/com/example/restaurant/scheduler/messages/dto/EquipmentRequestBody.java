@@ -1,5 +1,7 @@
 package com.example.restaurant.scheduler.messages.dto;
 
+import lombok.ToString;
+
 import java.time.LocalDateTime;
 
 /**
@@ -13,6 +15,7 @@ import java.time.LocalDateTime;
  * Важно: интервал [desiredStart, desiredEnd) должен совпадать с интервалом
  * выбранного варианта повара — оборудование и повар работают одновременно.
  */
+@ToString
 public class EquipmentRequestBody {
 
     /** ID задачи. */

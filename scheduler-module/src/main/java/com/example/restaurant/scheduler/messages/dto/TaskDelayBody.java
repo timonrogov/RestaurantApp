@@ -1,5 +1,7 @@
 package com.example.restaurant.scheduler.messages.dto;
 
+import lombok.ToString;
+
 /**
  * Тело сообщения TASK_DELAY_EVENT.
  * Отправляется SchedulerService → DispatcherAgent.
@@ -8,6 +10,7 @@ package com.example.restaurant.scheduler.messages.dto;
  * DispatcherAgent находит соответствующий OrderAgent и пересчитывает
  * notBefore для задач следующих курсов.
  */
+@ToString
 public class TaskDelayBody {
 
     private final long taskId;

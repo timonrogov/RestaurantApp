@@ -8,7 +8,9 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface CookingTaskRepository extends JpaRepository<CookingTask, Long> {
@@ -116,4 +118,58 @@ public interface CookingTaskRepository extends JpaRepository<CookingTask, Long> 
     List<CookingTask> findForGantt(
             @Param("dayStart") LocalDateTime dayStart,
             @Param("dayEnd")   LocalDateTime dayEnd);
+
+    /**
+     * Получить актуальные задачи для KDS:
+     * 1. Все задачи в статусах PLANNED и IN_PROGRESS (текущая работа).
+     * 2. Задачи в статусе DONE, завершенные не раньше указанного времени (обычно начало дня).
+     */
+    @Query("""
+    SELECT t FROM CookingTask t 
+    WHERE t.assignedCook.id = :cookId 
+    AND (
+        t.status IN (
+            com.example.restaurant.enums.CookingTaskStatus.PLANNED, 
+            com.example.restaurant.enums.CookingTaskStatus.IN_PROGRESS
+        )
+        OR (
+            t.status = com.example.restaurant.enums.CookingTaskStatus.DONE 
+            AND t.actualEndTime >= :since
+            AND t.orderItem.order.status != com.example.restaurant.enums.OrderStatus.SERVED
+            AND t.orderItem.order.status != com.example.restaurant.enums.OrderStatus.CANCELED
+        )
+    )
+""")
+    List<CookingTask> findActiveAndRecentlyDoneTasks(
+            @Param("cookId") Long cookId,
+            @Param("since") LocalDateTime since);
+
+    /**
+     * [Исправление 5] PLANNED-задачи того же курса и заказа, назначенные
+     * НА ДРУГИХ поваров (не на того, кто начал досрочно).
+     *
+     * Используется в DispatcherAgent.shiftSubsequentTasks при отрицательном
+     * delayMinutes: когда один повар начал задачу раньше плана, задачи
+     * его «соседей» по курсу тоже нужно сдвинуть назад, иначе следующий
+     * курс приедет к ним раньше, чем они закончат текущий.
+     */
+    @Query("SELECT t FROM CookingTask t " +
+            "WHERE t.orderItem.order.id = :orderId " +
+            "AND t.orderItem.courseNumber = :courseNumber " +
+            "AND t.assignedCook.id != :excludeCookId " +
+            "AND t.status = com.example.restaurant.enums.CookingTaskStatus.PLANNED")
+    List<CookingTask> findSameCourseTasksForOtherCooks(
+            @Param("orderId") Long orderId,
+            @Param("courseNumber") int courseNumber,
+            @Param("excludeCookId") Long excludeCookId);
+
+    /**
+     * [Исправление 6] Максимальное plannedEndTime среди задач с указанными ID.
+     *
+     * Заменяет findAll() в OrderAgent.recalculateLatestPlannedEnd():
+     * вместо загрузки всей таблицы выполняем один агрегатный запрос.
+     */
+    @Query("SELECT MAX(t.plannedEndTime) FROM CookingTask t WHERE t.id IN :ids")
+    Optional<LocalDateTime> findMaxPlannedEndTimeByIds(
+            @Param("ids") Collection<Long> ids);
 }

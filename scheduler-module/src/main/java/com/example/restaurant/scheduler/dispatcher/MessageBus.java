@@ -47,6 +47,12 @@ public class MessageBus {
     /** Очередь сообщений, ожидающих доставки. */
     private final Queue<DeliveryItem> queue = new LinkedList<>();
 
+    private final NegotiationFileLogger fileLogger;
+
+    public MessageBus(NegotiationFileLogger fileLogger) {
+        this.fileLogger = fileLogger;
+    }
+
     // -----------------------------------------------------------------------
     // Регистрация агентов
     // -----------------------------------------------------------------------
@@ -105,6 +111,7 @@ public class MessageBus {
      */
     public void deliver(String recipientId, Message message) {
         queue.add(new DeliveryItem(recipientId, message));
+        fileLogger.logCommunication(message, recipientId);
         log.trace("В очередь добавлено: {} → {}, тип={}", message.getSenderId(), recipientId, message.getType());
     }
 

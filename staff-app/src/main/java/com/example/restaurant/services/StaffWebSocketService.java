@@ -76,6 +76,19 @@ public class StaffWebSocketService {
     }
 
     /**
+     * Уведомить KDS-экраны, что заказ подан официантом.
+     * KDS удалит из колонки «Готово» все карточки этого заказа.
+     *
+     * @param orderId ID поданного заказа
+     */
+    public void notifyKdsOrderServed(Long orderId) {
+        messagingTemplate.convertAndSend("/topic/kds", Map.of(
+                "type",    "ORDER_SERVED",
+                "orderId", orderId
+        ));
+    }
+
+    /**
      * Уведомить страницу вызовов и шапку (бейдж) об изменении вызовов.
      *
      * @param type            тип события: "NEW_CALL" или "CALL_RESOLVED"

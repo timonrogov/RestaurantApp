@@ -14,6 +14,8 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -34,28 +36,27 @@ public class AdminOrderController {
     @GetMapping
     public String getOrders(@RequestParam(required = false) String status, Model model) {
 
-        // 1. Получаем список статусов для фильтра (исключая "Сборку")
-        // Используем Stream API прямо по значениям Enum
         List<OrderStatus> allStatuses = Arrays.stream(OrderStatus.values())
                 .filter(s -> s != OrderStatus.ASSEMBLY)
                 .collect(Collectors.toList());
 
-        // 2. Конвертируем пришедшую строку (status) в Enum для передачи в сервис
-        // Если строка пустая или null, передаем null (значит "все статусы")
         OrderStatus statusFilter = null;
         if (status != null && !status.isEmpty()) {
             try {
                 statusFilter = OrderStatus.valueOf(status);
             } catch (IllegalArgumentException e) {
-                // Если пришел некорректный статус, игнорируем фильтр
+                // некорректный статус — игнорируем
             }
         }
 
-        // 3. Вызываем сервис (убедись, что в OrderService метод принимает OrderStatus!)
-        model.addAttribute("orders", orderService.getOrdersForAdminPanel(statusFilter));
-
+        // ИЗМЕНЕНО: фильтруем только сегодняшние заказы
+        model.addAttribute("orders", orderService.getOrdersForAdminPanelToday(statusFilter));
         model.addAttribute("statuses", allStatuses);
-        model.addAttribute("selectedStatus", status); // Возвращаем строку, чтобы в <select> выбрать нужное значение
+        model.addAttribute("selectedStatus", status);
+
+        // ДОБАВЛЕНО: передаём текущую дату для отображения в заголовке страницы
+        model.addAttribute("today", LocalDate.now()
+                .format(DateTimeFormatter.ofPattern("dd.MM.yyyy")));
 
         return "admin-orders";
     }

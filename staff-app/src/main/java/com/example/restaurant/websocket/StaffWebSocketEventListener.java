@@ -43,6 +43,11 @@ public class StaffWebSocketEventListener {
 
         // Планировщик тоже нужно обновить (новый заказ или отмена влияют на задачи)
         wsService.notifySchedulerUpdate();
+
+        // При подаче заказа — очищаем его задачи с KDS
+        if (event.getNewStatus() == com.example.restaurant.enums.OrderStatus.SERVED) {
+            wsService.notifyKdsOrderServed(event.getOrderId());
+        }
     }
 
     /**

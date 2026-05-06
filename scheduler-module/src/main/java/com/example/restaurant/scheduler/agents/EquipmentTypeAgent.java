@@ -52,6 +52,7 @@ public class EquipmentTypeAgent extends BaseAgent {
         switch (message.getType()) {
             case EQUIPMENT_REQUEST -> handleEquipmentRequest(message);
             case PLANNING_REQUEST  -> handlePlanningRequest(message);
+            case FREE_SLOT         -> handleFreeSlot(message);
             default -> log.warn("{}: получено неожиданное сообщение типа {}",
                     agentId, message.getType());
         }
@@ -287,6 +288,16 @@ public class EquipmentTypeAgent extends BaseAgent {
             String taskAgentId = "TASK_" + taskId;
             send(taskAgentId, MessageType.REMOVE_TASK, taskId);
             log.info("{}: задача {} вытеснена из-за уменьшения ёмкости", agentId, taskId);
+        }
+    }
+
+    /**
+     * Обработать запрос добровольного освобождения слота оборудования.
+     */
+    private void handleFreeSlot(Message message) {
+        Long taskId = (Long) message.getBody();
+        if (schedule.removeSlotByTaskId(taskId)) {
+            log.info("{}: слот задачи {} освобожден по запросу FREE_SLOT", agentId, taskId);
         }
     }
 

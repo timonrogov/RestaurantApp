@@ -7,6 +7,7 @@ import com.example.restaurant.repositories.*;
 import com.example.restaurant.scheduler.agents.*;
 import com.example.restaurant.scheduler.dispatcher.DispatcherAgent;
 import com.example.restaurant.scheduler.dispatcher.MessageBus;
+import com.example.restaurant.scheduler.dispatcher.NegotiationFileLogger;
 import com.example.restaurant.scheduler.messages.Message;
 import com.example.restaurant.scheduler.messages.MessageType;
 import com.example.restaurant.scheduler.schedule.CookSchedule;
@@ -43,6 +44,7 @@ class SchedulerIntegrationTest {
     private CookingTaskTemplateRepository templateRepository;
     private OrderCourseRepository orderCourseRepository;
     private OrderRepository orderRepository;
+    private NegotiationFileLogger fileLogger;
 
     // Фиксированное время для предсказуемых тестов
     private final LocalDateTime NOW = LocalDateTime.of(2025, 1, 1, 12, 0);
@@ -53,7 +55,7 @@ class SchedulerIntegrationTest {
     @BeforeEach
     void setUp() {
         // 1. Создаём шину сообщений
-        messageBus = new MessageBus();
+        messageBus = new MessageBus(fileLogger);
 
         // 2. Мокируем все репозитории (Создаем их!)
         taskRepository       = mock(CookingTaskRepository.class);
@@ -105,7 +107,7 @@ class SchedulerIntegrationTest {
                 .thenReturn(List.of());
 
         // 8. Создаём и регистрируем DispatcherAgent
-        dispatcher = new DispatcherAgent(messageBus, taskRepository, templateRepository, orderCourseRepository);
+        dispatcher = new DispatcherAgent(messageBus, taskRepository, templateRepository, orderCourseRepository, orderRepository);
         messageBus.register(dispatcher);
     }
 

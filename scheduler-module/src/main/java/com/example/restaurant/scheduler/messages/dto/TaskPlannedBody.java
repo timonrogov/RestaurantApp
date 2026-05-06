@@ -1,5 +1,7 @@
 package com.example.restaurant.scheduler.messages.dto;
 
+import lombok.ToString;
+
 import java.time.LocalDateTime;
 
 /**
@@ -10,6 +12,7 @@ import java.time.LocalDateTime;
  * OrderAgent использует confirmedEnd для вычисления latestPlannedEnd курса,
  * которое потом станет notBefore для следующего курса.
  */
+@ToString
 public class TaskPlannedBody {
 
     private final long taskId;

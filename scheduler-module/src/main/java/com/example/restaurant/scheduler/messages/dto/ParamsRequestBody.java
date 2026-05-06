@@ -1,6 +1,7 @@
 package com.example.restaurant.scheduler.messages.dto;
 
 import com.example.restaurant.enums.CookSpecialization;
+import lombok.ToString;
 
 import java.time.LocalDateTime;
 
@@ -11,6 +12,7 @@ import java.time.LocalDateTime;
  * Содержит всё необходимое для того, чтобы CookAgent мог
  * найти подходящие варианты размещения в своём расписании.
  */
+@ToString
 public class ParamsRequestBody {
 
     /** ID задачи (CookingTask.id). CookAgent вернёт это же значение в ответе. */

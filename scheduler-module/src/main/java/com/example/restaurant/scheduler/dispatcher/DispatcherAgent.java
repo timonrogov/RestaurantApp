@@ -25,9 +25,7 @@ import com.example.restaurant.scheduler.schedule.ScheduleSlot;
 import java.time.LocalDateTime;
 
 import java.time.temporal.ChronoUnit;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Агент-диспетчер — точка входа всей мультиагентной системы.
@@ -466,152 +464,34 @@ public class DispatcherAgent extends BaseAgent {
 
 
     // -----------------------------------------------------------------------
-// Сдвиг расписания при задержке / досрочном завершении
-// -----------------------------------------------------------------------
+    // Сдвиг расписания при задержке / досрочном завершении
+    // -----------------------------------------------------------------------
 
     /**
-     * Обработать задержку задачи — сдвинуть последующие задачи.
-     *
-     * Тело сообщения: {@link TaskDelayBody}.
-     * delayMinutes > 0 → сдвиг вперёд (задержка).
-     * delayMinutes < 0 → сдвиг назад (досрочное завершение).
+     * Обработать событие задержки/досрочного завершения задачи.
+     * Диспетчер теперь не двигает расписание сам! Он просто находит заказ
+     * и пересылает это событие в OrderAgent.
      */
     private void handleTaskDelayEvent(Message message) {
         TaskDelayBody body = (TaskDelayBody) message.getBody();
         long taskId = body.getTaskId();
-        int delayMinutes = body.getDelayMinutes();
-
-        if (delayMinutes == 0) return;
 
         taskRepository.findById(taskId).ifPresentOrElse(
-                task -> shiftSubsequentTasks(task, delayMinutes),
+                task -> {
+                    long orderId = task.getOrderItem().getOrder().getId();
+                    String orderAgentId = "ORDER_" + orderId;
+                    log.info("{}: пересылаем TASK_DELAY_EVENT агенту {}", agentId, orderAgentId);
+                    send(orderAgentId, MessageType.TASK_DELAY_EVENT, body);
+                },
                 () -> log.warn("{}: TASK_DELAY_EVENT для задачи #{} — задача не найдена в БД",
                         agentId, taskId)
         );
     }
 
-    /**
-     * Сдвинуть последующие PLANNED-задачи при задержке или досрочном завершении.
-     *
-     * Алгоритм:
-     *   1. Сдвинуть in-memory слот задержанной задачи (чтобы расписание было актуальным)
-     *   2. Найти все PLANNED-задачи того же повара с startTime > plannedEndTime задержанной
-     *   3. Сдвинуть их время в БД и in-memory расписании
-     *   4. Найти PLANNED-задачи следующих курсов того же заказа
-     *   5. Сдвинуть их аналогично
-     *   6. Не сдвигать задачи в прошлое (минимум — now())
-     *
-     * @param task         задержанная задача
-     * @param delayMinutes на сколько минут сдвинуть (может быть отрицательным)
-     */
-    private void shiftSubsequentTasks(CookingTask task, int delayMinutes) {
-        if (task.getAssignedCook() == null || task.getPlannedEndTime() == null) {
-            log.debug("{}: задача #{} не имеет назначенного повара или планового времени — пропускаем",
-                    agentId, task.getId());
-            return;
-        }
 
-        long cookId = task.getAssignedCook().getId();
-        LocalDateTime taskEnd = task.getPlannedEndTime();
-        LocalDateTime now = LocalDateTime.now();
-        long orderId = task.getOrderItem().getOrder().getId();
-        int courseNumber = task.getOrderItem().getCourseNumber();
-
-        // === ИСПРАВЛЕНИЕ ===
-        // В БД уже лежит новое время. Чтобы найти задачи, идущие "встык",
-        // нам нужно откатиться к старому плановому времени окончания.
-        LocalDateTime oldTaskEnd;
-        if (delayMinutes > 0) {
-            oldTaskEnd = task.getPlannedEndTime().minusMinutes(delayMinutes);
-        } else {
-            oldTaskEnd = task.getPlannedEndTime(); // При досрочном завершении (отрицательный delay) время в БД еще старое
-        }
-
-        log.info("{}: сдвиг расписания из-за задачи #{} на {} мин. Повар COOK_{}, заказ #{}",
-                agentId, task.getId(), delayMinutes, cookId, orderId);
-
-        // 1. Сдвиг задачи повара в in-memory расписании
-        CookAgent cookAgent = cookAgents.get(cookId);
-        if (cookAgent != null) {
-            cookAgent.getSchedule().findByTaskId(task.getId()).ifPresent(slot -> {
-                LocalDateTime newEnd = slot.getEndTime().plusMinutes(delayMinutes);
-                if (newEnd.isBefore(now)) newEnd = now;
-                slot.setEndTime(newEnd);
-            });
-        }
-
-        // 2. ИСПОЛЬЗУЕМ oldTaskEnd для поиска следующих задач
-        List<CookingTask> cookTasks = taskRepository
-                .findByAssignedCookIdAndStatusAndPlannedStartTimeGreaterThanEqual(
-                        cookId, CookingTaskStatus.PLANNED, oldTaskEnd);
-
-        for (CookingTask t : cookTasks) {
-            shiftSingleTask(t, delayMinutes, now, cookAgent);
-        }
-
-        // 3. Найти PLANNED-задачи следующих курсов того же заказа
-        List<CookingTask> nextCourseTasks = taskRepository
-                .findNextCourseTasks(orderId, courseNumber);
-
-        for (CookingTask t : nextCourseTasks) {
-            // Не дублировать: если задача уже сдвинута в шаге 2 — пропустить
-            boolean alreadyShifted = cookTasks.stream()
-                    .anyMatch(ct -> ct.getId().equals(t.getId()));
-            if (!alreadyShifted) {
-                Long assignedCookId = t.getAssignedCook() != null ? t.getAssignedCook().getId() : null;
-                CookAgent assignedAgent = assignedCookId != null ? cookAgents.get(assignedCookId) : null;
-                shiftSingleTask(t, delayMinutes, now, assignedAgent);
-            }
-        }
-
-        log.info("{}: сдвиг завершён. Затронуто задач повара: {}, следующих курсов: {}",
-                agentId, cookTasks.size(), nextCourseTasks.size());
-    }
-
-    /**
-     * Сдвинуть время одной задачи в БД и в in-memory расписании её повара.
-     *
-     * @param task       задача для сдвига
-     * @param minutes    на сколько минут (знак определяет направление)
-     * @param now        текущее время (нижняя граница — не сдвигаем в прошлое)
-     * @param cookAgent  агент повара, или null если не известен
-     */
-    private void shiftSingleTask(CookingTask task, int minutes, LocalDateTime now, CookAgent cookAgent) {
-        // 1. Сначала вычисляем новое предполагаемое время
-        LocalDateTime newStart = task.getPlannedStartTime().plusMinutes(minutes);
-        LocalDateTime newEnd = task.getPlannedEndTime().plusMinutes(minutes);
-
-        // 2. Не сдвигаем задачу в прошлое
-        if (newStart.isBefore(now)) {
-            // Если пытаемся сдвинуть в прошлое, то начинаем прямо СЕЙЧАС (now)
-            // А продолжительность задачи (duration) оставляем прежней.
-            long duration = ChronoUnit.MINUTES.between(task.getPlannedStartTime(), task.getPlannedEndTime());
-            newStart = now;
-            newEnd = now.plusMinutes(duration);
-        }
-
-        // Обновляем БД
-        task.setPlannedStartTime(newStart);
-        task.setPlannedEndTime(newEnd);
-        taskRepository.save(task);
-
-        // Обновляем in-memory расписание повара
-        if (cookAgent != null) {
-            LocalDateTime finalNewStart = newStart;
-            LocalDateTime finalNewEnd = newEnd;
-            cookAgent.getSchedule().findByTaskId(task.getId()).ifPresent(slot -> {
-                slot.setStartTime(finalNewStart);
-                slot.setEndTime(finalNewEnd);
-            });
-        }
-
-        log.debug("{}: задача #{} сдвинута → [{} → {}]",
-                agentId, task.getId(), newStart, newEnd);
-    }
-
-// -----------------------------------------------------------------------
-// Восстановление расписания после перезапуска
-// -----------------------------------------------------------------------
+    // -----------------------------------------------------------------------
+    // Восстановление расписания после перезапуска
+    // -----------------------------------------------------------------------
 
     /**
      * Восстановить in-memory расписания поваров и оборудования из БД.

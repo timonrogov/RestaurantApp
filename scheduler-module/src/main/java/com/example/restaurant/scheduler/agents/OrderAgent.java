@@ -245,47 +245,130 @@ public class OrderAgent extends BaseAgent {
     private CourseTimeParams calculateCourseTimes(int courseIndex) {
         CourseState current = courseStates.get(courseIndex);
         List<CookingTask> tasks = taskRepository.findAllById(current.taskIds);
-        int maxDuration = tasks.stream().mapToInt(t -> t.getTemplate().getDurationMinutes()).max().orElse(0);
+
+        // Максимальная длительность задачи в курсе — используется для вычисления
+        // notBefore: чтобы самая долгая задача успела завершиться к targetEndTime,
+        // нужно начать не позже чем targetEndTime - maxDuration.
+        int maxDuration = tasks.stream()
+                .mapToInt(t -> t.getTemplate().getDurationMinutes())
+                .max()
+                .orElse(0);
 
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime notBefore;
         LocalDateTime targetEndTime;
 
-        // 1. Актуализируем время текущего курса (вдруг кто-то уже начал работу)
+        // Пересчитываем latestPlannedEnd текущего курса из актуальных данных БД.
+        // Это нужно потому что между вызовами calculateCourseTimes() статусы задач
+        // могут измениться (IN_PROGRESS → DONE и т.д.).
         recalculateLatestPlannedEnd(current);
 
         if (courseIndex == 0) {
-            // --- ДЛЯ ПЕРВОГО КУРСА ---
+            // ---------------------------------------------------------------
+            // ПЕРВЫЙ КУРС
+            // ---------------------------------------------------------------
+
             if (current.latestPlannedEnd != null && current.latestPlannedEnd.isAfter(now)) {
-                // ИСПРАВЛЕНИЕ: Если кто-то УЖЕ начал готовить первый курс,
-                // весь курс выравнивается по нему! (никаких слепых +1 минута)
+                // Ветка А: кто-то из поваров уже готовит (IN_PROGRESS) или запланирован
+                // (PLANNED) и его плановый конец ещё в будущем.
+                //
+                // В этом случае весь курс «якорится» по этому повару: остальные задачи
+                // должны закончиться одновременно с ним. Буфер здесь не нужен —
+                // реальное время уже зафиксировано фактом начала работы.
+                //
+                // Пример: COOK_1 начал напиток в 14:14, закончит в 14:24.
+                //   targetEndTime = 14:24
+                //   notBefore     = 14:24 - 10 = 14:14, но не раньше now(14:17) → 14:17
                 targetEndTime = current.latestPlannedEnd;
                 notBefore = targetEndTime.minusMinutes(maxDuration);
                 if (notBefore.isBefore(now)) notBefore = now;
+
             } else {
-                // Никто еще не начал - планируем от текущего момента
-                notBefore = now.plusMinutes(1);
-                targetEndTime = now.plusMinutes(1 + maxDuration);
+                // Ветка Б: никто ещё не начал (все задачи курса в PENDING/FAILED
+                // или latestPlannedEnd уже в прошлом — курс «просрочен»).
+                //
+                // П4-ИЗМЕНЕНИЕ: буфер +1 мин добавляется ТОЛЬКО при первом
+                // планировании (firstPlanningDone == false).
+                //
+                // Зачем буфер при первом планировании?
+                // Между моментом когда OrderAgent вычисляет notBefore и моментом
+                // когда повар фактически видит задачу на KDS проходит некоторое время
+                // (обработка очереди MessageBus, запись в БД, WebSocket-пуш).
+                // Без буфера задача с notBefore = now рискует сразу попасть в «просрочку»
+                // и спровоцировать лишнее перепланирование ещё до того, как повар
+                // успел её взять.
+                //
+                // Зачем убирать буфер при перепланировании?
+                // При перепланировании ситуация уже активная: например, повар закончил
+                // задачу на 2 минуты раньше и мы хотим сдвинуть следующие задачи назад.
+                // Если добавить +1 мин, мы потеряем часть выигрыша. Здесь нужна точность.
+                if (!current.firstPlanningDone) {
+                    // Первое планирование — с буфером.
+                    notBefore = now.plusMinutes(1);
+                    targetEndTime = now.plusMinutes(1 + maxDuration);
+                } else {
+                    // Перепланирование — без буфера.
+                    notBefore = now;
+                    targetEndTime = now.plusMinutes(maxDuration);
+                }
             }
+
         } else {
-            // --- ДЛЯ ОСТАЛЬНЫХ КУРСОВ ---
+            // ---------------------------------------------------------------
+            // КУРС N > 0 (второй, третий и т.д.)
+            // ---------------------------------------------------------------
+
             CourseState previous = courseStates.get(courseIndex - 1);
             recalculateLatestPlannedEnd(previous);
-            LocalDateTime prevEnd = previous.latestPlannedEnd != null ? previous.latestPlannedEnd : now;
+            LocalDateTime prevEnd = previous.latestPlannedEnd != null
+                    ? previous.latestPlannedEnd
+                    : now;
 
-            // Базовый расчет от предыдущего курса
+            // Базовый расчёт: этот курс должен закончиться через syncGapMinutes
+            // после окончания предыдущего.
+            //
+            // syncGapMinutes — это минимальная пауза между подачей предыдущего блюда
+            // и подачей этого. Например, пауза между закусками и основным = 15 мин.
+            //
+            //   prevEnd = 14:30 (напитки закончились)
+            //   syncGapMinutes = 5
+            //   targetEndTime = 14:35 (салаты должны быть готовы к 14:35)
+            //   notBefore = 14:35 - 10 = 14:25 (самая долгая задача курса = 10 мин)
             targetEndTime = prevEnd.plusMinutes(current.syncGapMinutes);
             notBefore = targetEndTime.minusMinutes(maxDuration);
 
-            // Защита от "прошлого"
-            if (notBefore.isBefore(now)) {
-                notBefore = now;
+            // НП1-ИСПРАВЛЕНИЕ: разделяем два случая.
+            //
+            // Случай А: targetEndTime уже в прошлом (курс сильно задержан).
+            // Планируем от текущего момента — единственный разумный вариант.
+            if (targetEndTime.isBefore(now)) {
                 targetEndTime = now.plusMinutes(maxDuration);
             }
-
-            // ИСПРАВЛЕНИЕ: Если мы перепланируем курс, в котором УЖЕ есть начатые задачи,
-            // их время окончания приоритетнее, чем время, рассчитанное от предыдущего курса!
-            if (current.latestPlannedEnd != null && current.latestPlannedEnd.isAfter(targetEndTime)) {
+            // Случай Б: notBefore в прошлом, но targetEndTime в будущем.
+            // Это нормальная ситуация при задержках в предыдущем курсе.
+            //
+            // targetEndTime не трогаем — он остаётся prevEnd + syncGap (правильным).
+            // notBefore обрезаем до now: findAsapSlot() требует значение не в прошлом,
+            // иначе при пустом расписании вернёт время из прошлого.
+            //
+            // Пример: prevEnd = 17:58, syncGap = 5, maxDuration = 15, now = 17:59.
+            //   Было: notBefore → 17:59, targetEndTime → 18:14 (терялся syncGap!)
+            //   Стало: notBefore → 17:59, targetEndTime → 18:03 (syncGap сохранён)
+            //
+            // Примечание: ранние повара (свободные до now) всё равно предложат
+            // ASAP = now, а не своё реальное время освобождения. Это ограничение
+            // устраняется отдельно через механизм lastTaskEnd в CookSchedule.
+            if (notBefore.isBefore(now)) {
+                notBefore = now;
+            }
+            // Если в текущем курсе уже есть начатые (IN_PROGRESS) или запланированные
+            // задачи, их плановый конец важнее «теоретического» расчёта.
+            //
+            // Пример: курс салатов уже планируется, первая задача назначена на COOK_2
+            // с окончанием 14:38. Расчёт от предыдущего курса даёт targetEndTime = 14:35.
+            // Нужно взять 14:38, иначе мы будем «тянуть назад» уже запланированную задачу.
+            if (current.latestPlannedEnd != null
+                    && current.latestPlannedEnd.isAfter(targetEndTime)) {
                 targetEndTime = current.latestPlannedEnd;
                 notBefore = targetEndTime.minusMinutes(maxDuration);
                 if (notBefore.isBefore(now)) notBefore = now;
@@ -300,75 +383,92 @@ public class OrderAgent extends BaseAgent {
         if (currentCourseIndex >= courseStates.size()) return;
         CourseState current = courseStates.get(currentCourseIndex);
 
-        log.info("{}: запуск планирования курса {} ({} задач)", agentId, current.courseNumber, current.taskIds.size());
+        log.info("{}: запуск планирования курса {} ({} задач)",
+                agentId, current.courseNumber, current.taskIds.size());
 
         List<CookingTask> tasks = taskRepository.findAllById(current.taskIds);
 
-        // Берем только те задачи, которые нуждаются в планировании
+        // Убрана сортировка по убыванию длительности.
+        //
+        // Раньше задачи сортировались от самой длинной к самой короткой,
+        // и планировались по одной. Это создавало эффект «первый занял лучшего».
+        // Теперь порядок не важен — все задачи стартуют одновременно.
         List<CookingTask> tasksToPlan = tasks.stream()
-                .filter(t -> t.getStatus() == CookingTaskStatus.PENDING || t.getStatus() == CookingTaskStatus.FAILED)
-                .sorted(Comparator.comparingInt((CookingTask t) -> t.getTemplate().getDurationMinutes()).reversed())
+                .filter(t -> t.getStatus() == CookingTaskStatus.PENDING
+                        || t.getStatus() == CookingTaskStatus.FAILED)
                 .toList();
 
-        current.sortedTaskIdsToPlan = new ArrayList<>(tasksToPlan.stream().map(CookingTask::getId).toList());
-        current.currentTaskIndex = 0;
-
-        // Актуализируем список уже запланированных задач (если это перепланирование)
+        // Актуализируем список уже запланированных задач (при перепланировании
+        // некоторые могут быть уже IN_PROGRESS или DONE — их не трогаем).
         current.plannedTaskIds.clear();
         for (CookingTask t : tasks) {
-            if (t.getStatus() != CookingTaskStatus.PENDING && t.getStatus() != CookingTaskStatus.FAILED && t.getStatus() != CookingTaskStatus.CANCELLED) {
+            if (t.getStatus() != CookingTaskStatus.PENDING
+                    && t.getStatus() != CookingTaskStatus.FAILED
+                    && t.getStatus() != CookingTaskStatus.CANCELLED) {
                 current.plannedTaskIds.add(t.getId());
             }
         }
         recalculateLatestPlannedEnd(current);
 
-        if (current.sortedTaskIdsToPlan.isEmpty()) {
+        if (tasksToPlan.isEmpty()) {
+            // Все задачи курса уже в нужном статусе — сразу проверяем завершение.
             checkCourseCompletion(current);
             return;
         }
 
-        // Регистрируем новых агентов (если они еще не созданы)
+        // Временны́е параметры вычисляются ОДИН РАЗ для всего курса.
+        //
+        // Раньше calculateCourseTimes() вызывался внутри planNextTaskInCurrentCourse()
+        // отдельно для каждой задачи. Между вызовами могло накапливаться состояние
+        // (latestPlannedEnd обновлялся по ходу), поэтому разные задачи получали
+        // разные targetEndTime — что само по себе некорректно: все задачи курса
+        // должны стремиться к одному целевому времени окончания.
+        CourseTimeParams times = calculateCourseTimes(currentCourseIndex);
+
+        // Фиксируем, что первое планирование этого курса состоялось.
+        // При следующих вызовах calculateCourseTimes() для этого курса
+        // буфер +1 мин добавляться не будет.
+        current.firstPlanningDone = true;
+
+        log.debug("{}: параметры курса {}: notBefore={}, targetEnd={}, deadline={}",
+                agentId, current.courseNumber,
+                times.notBefore, times.targetEndTime, times.deadline);
+
+        // Регистрируем и запускаем ВСЕ задачи курса одновременно.
+        //
+        // Каждая задача получает одинаковые notBefore, targetEndTime, deadline.
+        // После этого все TaskAgent-ы параллельно (в рамках однопоточной очереди
+        // MessageBus) рассылают PARAMS_REQUEST поварам. Поскольку расписания поваров
+        // ещё не заняты задачами этого курса, каждый TaskAgent видит честную картину
+        // и выбирает оптимальный вариант для себя.
+        //
+        // Когда несколько TaskAgent-ов попытаются забронировать одного повара,
+        // первый успешно зарезервирует слот (PLANNING_REQUEST → success=true),
+        // остальные получат отказ (conflicts) и перейдут к следующему варианту.
+        // Это и есть мультиагентный торг в действии.
         for (CookingTask task : tasksToPlan) {
+            // Создаём TaskAgent если ещё не существует (первый запуск),
+            // или переиспользуем существующий (перепланирование).
             if (!taskIdToAgentId.containsKey(task.getId())) {
-                TaskAgent taskAgent = new TaskAgent(task, agentId, sceneAgent, taskRepository);
+                TaskAgent taskAgent = new TaskAgent(
+                        task, agentId, sceneAgent, taskRepository);
                 messageBus.register(taskAgent);
                 taskIdToAgentId.put(task.getId(), taskAgent.getAgentId());
             }
-        }
 
-        planNextTaskInCurrentCourse(current);
-    }
+            InitTaskPayload payload = new InitTaskPayload(
+                    times.notBefore, times.targetEndTime, times.deadline);
+            String taskAgentId = taskIdToAgentId.get(task.getId());
 
-    /**
-     * Запускает следующую по очереди задачу в текущем курсе.
-     * Вызывается на старте курса и после завершения планирования каждой задачи.
-     */
-    private void planNextTaskInCurrentCourse(CourseState course) {
-        if (course.currentTaskIndex < course.sortedTaskIdsToPlan.size()) {
-            long nextTaskId = course.sortedTaskIdsToPlan.get(course.currentTaskIndex);
-            course.currentTaskIndex++;
-
-            CourseTimeParams times = calculateCourseTimes(courseStates.indexOf(course));
-
-            // МАГИЯ JIT: Если в курсе уже есть начатые задачи (IN_PROGRESS),
-            // мы должны ориентироваться на них.
-            recalculateLatestPlannedEnd(course);
-
-            // Если кто-то в этом курсе УЖЕ готовится, то targetEndTime для
-            // остальных задач курса должен быть ТАКИМ ЖЕ, как у него.
-            if (course.latestPlannedEnd != null) {
-                times.targetEndTime = course.latestPlannedEnd;
-            }
-
-            InitTaskPayload payload = new InitTaskPayload(times.notBefore, times.targetEndTime, times.deadline);
-            String taskAgentId = taskIdToAgentId.get(nextTaskId);
-
-            log.debug("{}: отправлен INIT агенту {} (target={})", agentId, taskAgentId, times.targetEndTime);
+            log.debug("{}: отправлен INIT → {} (target={})",
+                    agentId, taskAgentId, times.targetEndTime);
             send(taskAgentId, MessageType.INIT, payload);
-        } else {
-            checkCourseCompletion(course);
         }
+
+        // После этого метод завершается. Дальнейшее управление —
+        // через входящие сообщения TASK_PLANNED и TASK_FAILED.
     }
+
 
     // -----------------------------------------------------------------------
     // Фаза 3: отслеживание результатов
@@ -382,41 +482,74 @@ public class OrderAgent extends BaseAgent {
         CourseState courseState = findCourseStateByTaskId(taskId);
         if (courseState == null) return;
 
-        // Фиксируем задачу
         courseState.markPlanned(taskId, confirmedEnd);
 
-        // Получаем актуальные рамки (calculateCourseTimes уже учел confirmedEnd как новый максимум)
+        // JIT-выравнивание: если только что запланированная задача задала новый
+        // (более поздний) targetEndTime, нужно перепланировать те задачи курса,
+        // которые заканчиваются значительно раньше — они «висят» с лишним разрывом.
         CourseTimeParams times = calculateCourseTimes(courseStates.indexOf(courseState));
 
-        // ЖЕЛЕЗОБЕТОННОЕ ВЫРАВНИВАНИЕ JIT:
-        // Ищем в курсе задачи, которые УЖЕ запланированы, но их конец РАНЬШЕ, чем новая цель!
-        // Это значит, что они приготовятся слишком рано и остынут. Их нужно сдвинуть вправо.
         List<Long> tasksToReplan = new ArrayList<>();
         for (Long plannedId : courseState.plannedTaskIds) {
-            if (plannedId != taskId) {
-                CookingTask pt = taskRepository.findById(plannedId).orElse(null);
-                // Если задача заканчивается раньше цели хотя бы на 30 секунд
-                if (pt != null && pt.getPlannedEndTime() != null &&
-                        pt.getPlannedEndTime().isBefore(times.targetEndTime.minusSeconds(30))) {
-                    tasksToReplan.add(plannedId);
-                }
+            if (plannedId == taskId) continue;
+
+            CookingTask pt = taskRepository.findById(plannedId).orElse(null);
+            if (pt == null) continue;
+
+            // Не трогаем задачи, которые уже выполняются или выполнены.
+            if (pt.getStatus() == CookingTaskStatus.IN_PROGRESS
+                    || pt.getStatus() == CookingTaskStatus.DONE) {
+                log.debug("{}: JIT-выравнивание: пропускаем задачу #{} в статусе {}",
+                        agentId, plannedId, pt.getStatus());
+                continue;
+            }
+
+            // Перепланируем только если задача заканчивается заметно раньше цели
+            // (30-секундный буфер исключает бесконечные микроперепланирования).
+            if (pt.getPlannedEndTime() != null
+                    && pt.getPlannedEndTime().isBefore(
+                    times.targetEndTime.minusSeconds(30))) {
+                tasksToReplan.add(plannedId);
             }
         }
 
         if (!tasksToReplan.isEmpty()) {
-            log.info("{}: задача {} задала новый дедлайн {}. Выравниваем {} старых задач.",
+            log.info("{}: задача #{} задала новый дедлайн {}. " +
+                            "Выравниваем {} ранее запланированных задач.",
                     agentId, taskId, times.targetEndTime, tasksToReplan.size());
 
             for (Long idToReplan : tasksToReplan) {
                 String taId = taskIdToAgentId.get(idToReplan);
                 if (taId != null) {
-                    CancelAndReplanBody payload = new CancelAndReplanBody(
-                            idToReplan, times.notBefore, times.targetEndTime, times.deadline
+                    // Шаг 1: отправляем CANCEL_AND_REPLAN — TaskAgent освобождает
+                    // слоты у повара и оборудования, сбрасывает своё состояние
+                    // и ждёт нового INIT.
+                    CancelAndReplanBody cancelPayload = new CancelAndReplanBody(
+                            idToReplan,
+                            times.notBefore,
+                            times.targetEndTime,
+                            times.deadline
                     );
-                    send(taId, MessageType.CANCEL_AND_REPLAN, payload);
+                    send(taId, MessageType.CANCEL_AND_REPLAN, cancelPayload);
+
+                    // П1-ИЗМЕНЕНИЕ: сразу отправляем INIT вместо добавления в очередь.
+                    //
+                    // Раньше задача добавлялась в sortedTaskIdsToPlan и получала INIT
+                    // только когда до неё «доходила очередь» в planNextTaskInCurrentCourse().
+                    // Теперь INIT отправляется немедленно вслед за CANCEL_AND_REPLAN.
+                    //
+                    // Порядок в MessageBus гарантирует корректность: CANCEL_AND_REPLAN
+                    // будет обработан первым (TaskAgent освободит слоты), и только
+                    // затем INIT запустит новые переговоры.
+                    InitTaskPayload initPayload = new InitTaskPayload(
+                            times.notBefore,
+                            times.targetEndTime,
+                            times.deadline
+                    );
+                    send(taId, MessageType.INIT, initPayload);
                 }
 
-                // Сбрасываем в БД
+                // Сбрасываем задачу в БД.
                 CookingTask pt = taskRepository.findById(idToReplan).orElseThrow();
                 pt.setStatus(CookingTaskStatus.PENDING);
                 pt.setPlannedStartTime(null);
@@ -425,28 +558,35 @@ public class OrderAgent extends BaseAgent {
                 pt.setAssignedEquipmentType(null);
                 taskRepository.save(pt);
 
-                // Возвращаем в очередь планирования
+                // Убираем из запланированных — она снова в процессе торга.
                 courseState.plannedTaskIds.remove(idToReplan);
-                if (!courseState.sortedTaskIdsToPlan.contains(idToReplan)) {
-                    courseState.sortedTaskIdsToPlan.add(idToReplan);
-                }
+
+                log.debug("{}: задача #{} отправлена на JIT-перепланирование",
+                        agentId, idToReplan);
             }
         }
 
-        if (!checkCourseCompletion(courseState)) {
-            planNextTaskInCurrentCourse(courseState);
-        }
+        // П1-ИЗМЕНЕНИЕ: убран вызов planNextTaskInCurrentCourse().
+        //
+        // Раньше здесь запускалась следующая задача из очереди. Теперь очереди нет:
+        // все задачи уже запущены из planCurrentCourse(). Просто проверяем,
+        // завершён ли курс (все задачи получили TASK_PLANNED или TASK_FAILED).
+        checkCourseCompletion(courseState);
     }
 
     private void handleTaskFailed(Message message) {
         long taskId = (Long) message.getBody();
+
         CourseState courseState = findCourseStateByTaskId(taskId);
         if (courseState == null) return;
 
         courseState.markFailed(taskId);
-        if (!checkCourseCompletion(courseState)) {
-            planNextTaskInCurrentCourse(courseState);
-        }
+
+        // П1-ИЗМЕНЕНИЕ: убран вызов planNextTaskInCurrentCourse().
+        //
+        // Провал одной задачи не должен влиять на остальные — они уже ведут
+        // переговоры параллельно. Просто фиксируем провал и проверяем завершение курса.
+        checkCourseCompletion(courseState);
     }
 
     private void handleTaskReplanning(Message message) {
@@ -573,22 +713,29 @@ public class OrderAgent extends BaseAgent {
             currentCourseIndex = startIndex;
         }
 
-        // ПРИНУДИТЕЛЬНО очищаем статусы в БД прямо здесь!
+        // ИСПРАВЛЕНО БАГ-05: проверяем статус из БД перед сбросом
         for (int i = startIndex; i < courseStates.size(); i++) {
             CourseState cs = courseStates.get(i);
             List<CookingTask> tasks = taskRepository.findAllById(cs.taskIds);
 
             for (CookingTask t : tasks) {
-                // Сбрасываем только те, что еще не начали готовиться
-                if (t.getStatus() == CookingTaskStatus.PLANNED || t.getStatus() == CookingTaskStatus.PENDING) {
+                // КРИТИЧНО: не трогаем IN_PROGRESS и DONE задачи
+                if (t.getStatus() == CookingTaskStatus.IN_PROGRESS
+                        || t.getStatus() == CookingTaskStatus.DONE) {
+                    log.debug("{}: пропускаем задачу #{} в статусе {} при TASK_DELAY_EVENT",
+                            agentId, t.getId(), t.getStatus());
+                    continue;
+                }
 
-                    // Уведомляем агента, чтобы он очистил память (RAM) у поваров
+                if (t.getStatus() == CookingTaskStatus.PLANNED
+                        || t.getStatus() == CookingTaskStatus.PENDING) {
+
                     String taId = taskIdToAgentId.get(t.getId());
                     if (taId != null) {
+                        // CANCEL_AND_REPLAN с body=null — TaskAgent сам снимет брони и будет ждать INIT
                         send(taId, MessageType.CANCEL_AND_REPLAN, null);
                     }
 
-                    // ЖЕСТКО меняем статус в БД, чтобы planCurrentCourse их увидел
                     t.setStatus(CookingTaskStatus.PENDING);
                     t.setPlannedStartTime(null);
                     t.setPlannedEndTime(null);
@@ -599,7 +746,6 @@ public class OrderAgent extends BaseAgent {
             }
         }
 
-        // Теперь вызываем планирование — теперь фильтр сработает правильно!
         planCurrentCourse();
     }
 
@@ -641,10 +787,22 @@ public class OrderAgent extends BaseAgent {
          */
         LocalDateTime latestPlannedEnd = null;
 
-        // === ДОБАВЛЯЕМ ПОЛЯ ДЛЯ ПОСЛЕДОВАТЕЛЬНОГО ЗАПУСКА ===
-        List<Long> sortedTaskIdsToPlan = new ArrayList<>();
-        int currentTaskIndex = 0;
-        // ====================================================
+        /**
+         * Флаг первого планирования этого курса.
+         *
+         * false → курс планируется впервые. В calculateCourseTimes() добавим
+         *         буфер +1 мин, чтобы задачи не оказались «в прошлом» к тому
+         *         моменту, когда повара фактически получат их на KDS.
+         *
+         * true  → курс уже планировался хотя бы раз (сейчас идёт перепланирование
+         *         из-за задержки или досрочного завершения). Буфер не нужен —
+         *         важна максимальная точность, а не запас.
+         *
+         * Флаг устанавливается в planCurrentCourse() перед первой рассылкой INIT.
+         * Сбрасывается — никогда: при всех последующих перепланированиях этого
+         * курса он остаётся true.
+         */
+        boolean firstPlanningDone = false;
 
         CourseState(int courseNumber, int syncGapMinutes) {
             this.courseNumber = courseNumber;

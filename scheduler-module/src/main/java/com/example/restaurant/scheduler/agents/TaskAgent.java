@@ -247,15 +247,11 @@ public class TaskAgent extends BaseAgent {
             if (replanCount >= MAX_REPLAN) {
                 failTask();
             } else {
-                // Варианты кончились, но попыток ещё нет — повторим попытку
-                // (может, поваров добавили или другие задачи освободили место)
                 startNegotiations();
             }
             return;
         }
 
-        // Фильтрация: asap/jit должны укладываться в дедлайн
-        // conflict-варианты оставляем (они всегда строятся с учётом дедлайна)
         List<PlacementVariant> viable = collectedVariants.stream()
                 .filter(v -> "conflict".equals(v.getVariantName())
                         || !v.getEndTime().isAfter(deadline))
@@ -271,29 +267,29 @@ public class TaskAgent extends BaseAgent {
             return;
         }
 
-        // Оценка каждого варианта
         long windowMinutes = SCORING_WINDOW_MINUTES;
 
         for (PlacementVariant variant : viable) {
-            // Оцениваем насколько точно мы попали в targetEndTime
-            double syncScore    = computeSyncScore(variant.getEndTime());
-            double speedScore   = computeSpeedScore(variant.getStartTime(), windowMinutes);
-            double loadScore    = computeLoadScore(variant.getResourceAgentId());
+            double syncScore  = computeSyncScore(variant.getEndTime());
+            double speedScore = computeSpeedScore(variant.getStartTime(), windowMinutes);
+            double loadScore  = computeLoadScore(variant.getResourceAgentId());
 
-            double total = 0.6 * syncScore + 0.2 * speedScore + 0.2 * loadScore; // Веса захардкожены
+            double total = 0.6 * syncScore + 0.2 * speedScore + 0.2 * loadScore;
 
             variant.setUrgencyScore(syncScore);
             variant.setSpeedScore(speedScore);
             variant.setLoadScore(loadScore);
             variant.setTotalScore(total);
 
-            log.debug("{}: вариант {} повар {} → urgency={:.2f} speed={:.2f} load={:.2f} total={:.2f}",
+            // ИСПРАВЛЕНИЕ БАГ-07: корректный формат для SLF4J (не Python {:.2f})
+            log.debug("{}: вариант {} повар {} → urgency={} speed={} load={} total={}",
                     agentId, variant.getVariantName(), variant.getResourceAgentId(),
-                    syncScore, speedScore, loadScore, total);
+                    String.format("%.2f", syncScore),
+                    String.format("%.2f", speedScore),
+                    String.format("%.2f", loadScore),
+                    String.format("%.2f", total));
         }
 
-        // Сортировка: conflict-варианты уходят в конец
-        // (предпочитаем не вытеснять если есть свободные слоты)
         evaluatedVariants = viable.stream()
                 .sorted(Comparator
                         .comparingInt((PlacementVariant v) ->
@@ -632,10 +628,17 @@ public class TaskAgent extends BaseAgent {
      * @param message сообщение с телом Long (taskId — для верификации)
      */
     private void handleRemoveTask(Message message) {
+        // ИСПРАВЛЕНО БАГ-06: защита IN_PROGRESS и DONE задач
+        if (task.getStatus() == CookingTaskStatus.IN_PROGRESS
+                || task.getStatus() == CookingTaskStatus.DONE) {
+            log.warn("{}: REMOVE_TASK проигнорирован — задача уже в статусе {}. " +
+                    "Нельзя вытеснить задачу, которая выполняется или выполнена.", agentId, task.getStatus());
+            return;
+        }
+
         replanCount++;
         log.info("{}: получен REMOVE_TASK (replanCount={}/{})", agentId, replanCount, MAX_REPLAN);
 
-        // Сбрасываем состояние резервирования
         task.setStatus(CookingTaskStatus.PENDING);
         task.setPlannedStartTime(null);
         task.setPlannedEndTime(null);
@@ -651,10 +654,7 @@ public class TaskAgent extends BaseAgent {
             return;
         }
 
-        // Уведомляем OrderAgent что задача перепланируется
         send(orderAgentId, MessageType.TASK_REPLANNING, task.getId());
-
-        // Перезапускаем переговоры
         startNegotiations();
     }
 
@@ -664,17 +664,26 @@ public class TaskAgent extends BaseAgent {
      * старые брони, обновляем рамки и запускаем торги с чистого листа.
      */
     private void handleCancelAndReplan(Message message) {
+        // ИСПРАВЛЕНО БАГ-06: критическая защита от перезаписи IN_PROGRESS и DONE задач
+        if (task.getStatus() == CookingTaskStatus.IN_PROGRESS
+                || task.getStatus() == CookingTaskStatus.DONE) {
+            log.warn("{}: CANCEL_AND_REPLAN проигнорирован — задача уже в статусе {}. " +
+                    "Задача выполняется или выполнена, брони не освобождаются.", agentId, task.getStatus());
+            return;
+        }
+
         log.info("{}: получен CANCEL_AND_REPLAN. Снимаем брони.", agentId);
 
+        // Освобождаем слот у повара (если был назначен)
         if (task.getAssignedCook() != null) {
             send("COOK_" + task.getAssignedCook().getId(), MessageType.FREE_SLOT, task.getId());
         }
+        // Освобождаем слот у оборудования (если было назначено)
         if (task.getAssignedEquipmentType() != null) {
             send("EQUIPMENT_TYPE_" + task.getAssignedEquipmentType(), MessageType.FREE_SLOT, task.getId());
         }
 
-        // Внутренний сброс состояния. БД обновит OrderAgent,
-        // чтобы избежать состояний гонки (Race Conditions).
+        // Сброс внутреннего состояния агента
         task.setStatus(CookingTaskStatus.PENDING);
         task.setPlannedStartTime(null);
         task.setPlannedEndTime(null);
@@ -684,8 +693,8 @@ public class TaskAgent extends BaseAgent {
         this.replanCount = 0;
         task.setReplanCount(0);
 
-        // ВАЖНО: Мы НЕ вызываем startNegotiations() здесь.
-        // OrderAgent сам пришлет нам новый INIT, когда придет наша очередь!
+        // ВАЖНО: НЕ вызываем startNegotiations() здесь.
+        // OrderAgent сам пришлёт новый INIT, когда придёт наша очередь.
     }
 
     // -----------------------------------------------------------------------

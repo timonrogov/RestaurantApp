@@ -41,7 +41,7 @@
                     </a>
 
                     <a th:href="@{/admin/calls}"
-                       sec:authorize="hasAnyRole('WAITER', 'ADMIN')"
+                       sec:authorize="hasAnyRole('WAITER')"
                        class="nav-item-link call-nav-link">
                         <i class="fas fa-concierge-bell"></i>
                         <span>Вызовы</span>

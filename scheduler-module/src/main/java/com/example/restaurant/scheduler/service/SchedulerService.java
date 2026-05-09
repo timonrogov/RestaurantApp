@@ -33,6 +33,7 @@ import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Spring-сервис — единственная точка входа в мультиагентную систему планировщика.
@@ -60,7 +61,7 @@ public class SchedulerService {
      * это значимым досрочным завершением и сдвигаем последующие задачи назад.
      * Значение 5 даёт небольшой буфер: мелкое расхождение не вызывает лишних сдвигов.
      */
-    private static final int EARLY_FINISH_THRESHOLD_MINUTES = 5;
+    private static final int EARLY_FINISH_THRESHOLD_MINUTES = 0;
 
     private final DispatcherAgent dispatcher;
     private final MessageBus messageBus;
@@ -234,28 +235,31 @@ public class SchedulerService {
     public void markTaskStarted(Long taskId) {
         CookingTask task = getTaskOrThrow(taskId);
         LocalDateTime now = LocalDateTime.now();
-
-        // 1. Берем чистую длительность из шаблона (техкарты), а не считаем разницу между плановыми датами
-        // Это гарантирует, что мы не накопим ошибки округления
         int duration = task.getTemplate().getDurationMinutes();
-
-        // 2. Считаем реальный сдвиг для истории (даже если это секунды)
         int shiftMinutes = (int) ChronoUnit.MINUTES.between(task.getPlannedStartTime(), now);
 
         task.setStatus(CookingTaskStatus.IN_PROGRESS);
         task.setActualStartTime(now);
         task.setLocalOverdue(false);
-
-        // 3. ПРИНУДИТЕЛЬНО приравниваем план к факту и сдвигаем конец
         task.setPlannedStartTime(now);
         task.setPlannedEndTime(now.plusMinutes(duration));
-
         cookingTaskRepository.save(task);
 
-        // 4. Всегда бросаем событие, если была хоть какая-то разница (для синхронизации соседей)
-        // Если shiftMinutes оказался 0 из-за секунд, но секунды были — OrderAgent всё равно проверит курс
-        TaskDelayBody delayBody = new TaskDelayBody(taskId, shiftMinutes, "Начало приготовления");
-        dispatchAndProcess(MessageType.TASK_DELAY_EVENT, delayBody);
+        // ИСПРАВЛЕНИЕ П2: синхронизируем ScheduleSlot в памяти с новым plannedEndTime
+        if (task.getAssignedCook() != null) {
+            dispatcher.updateCookSlotEndTime(taskId,
+                    task.getAssignedCook().getId(),
+                    task.getPlannedEndTime());
+        }
+
+        // ИСПРАВЛЕНИЕ П2: публикуем TASK_DELAY_EVENT при ЛЮБОМ ненулевом сдвиге
+        // (включая отрицательный — ранний старт)
+        if (shiftMinutes != 0) {
+            log.info("SchedulerService: задача #{} начата с {} мин ({}). Пересчёт расписания.",
+                    taskId, Math.abs(shiftMinutes), shiftMinutes > 0 ? "опоздание" : "досрочно");
+            TaskDelayBody delayBody = new TaskDelayBody(taskId, shiftMinutes, "Начало приготовления");
+            dispatchAndProcess(MessageType.TASK_DELAY_EVENT, delayBody);
+        }
 
         eventPublisher.publishEvent(new CookingTaskUpdatedEvent(this, task.getAssignedCook().getId()));
     }
@@ -383,7 +387,11 @@ public class SchedulerService {
         // 1. Задержки выполнения: IN_PROGRESS с просроченным endTime
         List<CookingTask> overdueExecution = cookingTaskRepository.findOverdueInProgressTasks(now);
         if (!overdueExecution.isEmpty()) {
-            log.info("SchedulerService: {} задач задерживают выполнение, вычисляем сдвиг", overdueExecution.size());
+            log.info("SchedulerService: {} задач задерживают выполнение", overdueExecution.size());
+
+            // ИСПРАВЛЕНО БАГ-04: группируем по заказу, берём максимальную задержку
+            Map<Long, CookingTask> worstTaskByOrder = new java.util.HashMap<>();
+            Map<Long, Integer> maxDelayByOrder = new java.util.HashMap<>();
 
             for (CookingTask task : overdueExecution) {
                 try {
@@ -394,24 +402,42 @@ public class SchedulerService {
                     task.setLocalOverdue(true);
                     task.setPlannedEndTime(oldEndTime.plusMinutes(delayMinutes));
                     cookingTaskRepository.save(task);
-
-                    TaskDelayBody body = new TaskDelayBody(
-                            task.getId(), delayMinutes,
-                            "auto: задача просрочена на " + delayMinutes + " мин.");
-                    dispatchAndProcess(MessageType.TASK_DELAY_EVENT, body);
-
                     hasChanges = true;
+
+                    // Группируем по orderId
+                    long orderId = task.getOrderItem().getOrder().getId();
+                    int currentMax = maxDelayByOrder.getOrDefault(orderId, 0);
+                    if (delayMinutes > currentMax) {
+                        maxDelayByOrder.put(orderId, delayMinutes);
+                        worstTaskByOrder.put(orderId, task);
+                    }
                 } catch (Exception e) {
-                    log.error("SchedulerService: ошибка при обработке задержки задачи #{}: {}",
+                    log.error("SchedulerService: ошибка при обработке задержки выполнения задачи #{}: {}",
                             task.getId(), e.getMessage(), e);
                 }
+            }
+
+            // Публикуем ОДНО событие на заказ
+            for (Map.Entry<Long, CookingTask> entry : worstTaskByOrder.entrySet()) {
+                int delay = maxDelayByOrder.get(entry.getKey());
+                CookingTask worstTask = entry.getValue();
+                TaskDelayBody body = new TaskDelayBody(
+                        worstTask.getId(), delay,
+                        "auto: задача просрочена на " + delay + " мин.");
+                dispatchAndProcess(MessageType.TASK_DELAY_EVENT, body);
+                log.info("SchedulerService: заказ #{} — публикуем одно TASK_DELAY_EVENT (задача #{}, задержка {} мин)",
+                        entry.getKey(), worstTask.getId(), delay);
             }
         }
 
         // 2. Задержки начала: PLANNED с просроченным startTime
         List<CookingTask> overdueStart = cookingTaskRepository.findOverduePlannedTasks(now);
         if (!overdueStart.isEmpty()) {
-            log.info("SchedulerService: {} задач задерживают начало, вычисляем сдвиг", overdueStart.size());
+            log.info("SchedulerService: {} задач задерживают начало", overdueStart.size());
+
+            // ИСПРАВЛЕНО БАГ-04: та же группировка по заказу
+            Map<Long, CookingTask> worstTaskByOrder = new java.util.HashMap<>();
+            Map<Long, Integer> maxDelayByOrder = new java.util.HashMap<>();
 
             for (CookingTask task : overdueStart) {
                 try {
@@ -423,17 +449,30 @@ public class SchedulerService {
                     task.setPlannedStartTime(oldStartTime.plusMinutes(delayMinutes));
                     task.setPlannedEndTime(task.getPlannedEndTime().plusMinutes(delayMinutes));
                     cookingTaskRepository.save(task);
-
-                    TaskDelayBody body = new TaskDelayBody(
-                            task.getId(), delayMinutes,
-                            "auto: начало просрочено на " + delayMinutes + " мин.");
-                    dispatchAndProcess(MessageType.TASK_DELAY_EVENT, body);
-
                     hasChanges = true;
+
+                    long orderId = task.getOrderItem().getOrder().getId();
+                    int currentMax = maxDelayByOrder.getOrDefault(orderId, 0);
+                    if (delayMinutes > currentMax) {
+                        maxDelayByOrder.put(orderId, delayMinutes);
+                        worstTaskByOrder.put(orderId, task);
+                    }
                 } catch (Exception e) {
                     log.error("SchedulerService: ошибка при обработке задержки начала задачи #{}: {}",
                             task.getId(), e.getMessage(), e);
                 }
+            }
+
+            // Публикуем ОДНО событие на заказ
+            for (Map.Entry<Long, CookingTask> entry : worstTaskByOrder.entrySet()) {
+                int delay = maxDelayByOrder.get(entry.getKey());
+                CookingTask worstTask = entry.getValue();
+                TaskDelayBody body = new TaskDelayBody(
+                        worstTask.getId(), delay,
+                        "auto: начало просрочено на " + delay + " мин.");
+                dispatchAndProcess(MessageType.TASK_DELAY_EVENT, body);
+                log.info("SchedulerService: заказ #{} — публикуем одно TASK_DELAY_EVENT (задача #{}, задержка {} мин)",
+                        entry.getKey(), worstTask.getId(), delay);
             }
         }
 

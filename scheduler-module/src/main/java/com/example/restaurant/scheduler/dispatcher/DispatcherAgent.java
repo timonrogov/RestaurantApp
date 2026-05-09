@@ -488,6 +488,23 @@ public class DispatcherAgent extends BaseAgent {
         );
     }
 
+    /**
+     * Обновить endTime слота задачи в расписании повара.
+     * Вызывается из SchedulerService при изменении плановых времён IN_PROGRESS задачи.
+     */
+    public void updateCookSlotEndTime(Long taskId, Long cookProfileId, LocalDateTime newEnd) {
+        CookAgent cookAgent = cookAgents.get(cookProfileId);
+        if (cookAgent == null) {
+            log.warn("updateCookSlotEndTime: CookAgent для cookId={} не найден", cookProfileId);
+            return;
+        }
+        cookAgent.getSchedule().findByTaskId(taskId).ifPresent(slot -> {
+            log.info("DISPATCHER: обновляем endTime слота задачи #{} у COOK_{}: {} → {}",
+                    taskId, cookProfileId, slot.getEndTime(), newEnd);
+            slot.setEndTime(newEnd);
+        });
+    }
+
 
     // -----------------------------------------------------------------------
     // Восстановление расписания после перезапуска

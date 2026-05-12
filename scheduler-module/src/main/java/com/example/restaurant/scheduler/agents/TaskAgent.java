@@ -9,6 +9,7 @@ import com.example.restaurant.scheduler.messages.MessageType;
 import com.example.restaurant.scheduler.messages.dto.*;
 import com.example.restaurant.scheduler.schedule.CookSchedule;
 import com.example.restaurant.enums.CookingTaskStatus;
+import com.example.restaurant.scheduler.schedule.ScheduleSlot;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -288,11 +289,23 @@ public class TaskAgent extends BaseAgent {
                     String.format("%.2f", total));
         }
 
-        evaluatedVariants = viable.stream()
+        // Старый способ давал рассинхрон курсов при равных score у ASAP и JIT вариантов.
+        /*evaluatedVariants = viable.stream()
                 .sorted(Comparator
                         .comparingInt((PlacementVariant v) ->
                                 "conflict".equals(v.getVariantName()) ? 1 : 0)
                         .thenComparingDouble(PlacementVariant::getTotalScore).reversed())
+                .collect(java.util.stream.Collectors.toList());*/
+
+        evaluatedVariants = viable.stream()
+                .sorted(Comparator
+                        .comparingInt((PlacementVariant v) ->
+                                "conflict".equals(v.getVariantName()) ? 1 : 0)
+                        .thenComparingDouble(PlacementVariant::getTotalScore).reversed()
+                        // При равном score JIT предпочтительнее ASAP:
+                        // он ближе к targetEndTime, ASAP — как можно раньше
+                        .thenComparingInt((PlacementVariant v) ->
+                                "jit".equals(v.getVariantName()) ? 0 : 1))
                 .collect(java.util.stream.Collectors.toList());
 
         currentVariantIndex = 0;
@@ -336,10 +349,32 @@ public class TaskAgent extends BaseAgent {
             CookSchedule schedule = sceneAgent.getCookSchedule(cookId);
             if (schedule == null) return 0.5;
 
-            // Когда повар свободен в следующий раз (начиная с notBefore)?
+            /*// Когда повар свободен в следующий раз (начиная с notBefore)?
             LocalDateTime asapFree = schedule.findAsapSlot(0, notBefore);
             // Чем раньше освобождается — тем лучше (нормализуем по окну 60 мин)
-            long minutesUntilFree = ChronoUnit.MINUTES.between(notBefore, asapFree);
+            long minutesUntilFree = ChronoUnit.MINUTES.between(notBefore, asapFree);*/
+
+            // Исправление 1:
+            // Используем ТЕКУЩИЙ момент, а не notBefore
+            // Это показывает реальную «занятость» повара прямо сейчас
+            /*LocalDateTime now = LocalDateTime.now();
+            LocalDateTime asapFree = schedule.findAsapSlot(0, now);
+            long minutesUntilFree = ChronoUnit.MINUTES.between(now, asapFree);*/
+
+            // Исправление 2:
+            // Конец последнего запланированного слота повара.
+            // Это реальный момент, когда повар освободится полностью.
+            // findAsapSlot(0, now) давал ложный результат: если задача
+            // ещё не началась, он возвращал now (зазор до старта задачи),
+            // показывая занятого повара как свободного.
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime lastSlotEnd = schedule.getSlots().stream()
+                    .map(ScheduleSlot::getEndTime)
+                    .filter(end -> end.isAfter(now))
+                    .max(LocalDateTime::compareTo)
+                    .orElse(now);
+
+            long minutesUntilFree = ChronoUnit.MINUTES.between(now, lastSlotEnd);
             if (minutesUntilFree < 0) return 1.0;
             return Math.max(0.0, 1.0 - (double) minutesUntilFree / windowMinutesForNormalize);
         } catch (NumberFormatException e) {

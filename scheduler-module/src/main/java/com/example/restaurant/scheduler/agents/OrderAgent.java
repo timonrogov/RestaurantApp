@@ -18,6 +18,7 @@ import com.example.restaurant.scheduler.messages.dto.TaskDelayBody;
 import com.example.restaurant.scheduler.messages.dto.CancelAndReplanBody;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 /**
@@ -497,7 +498,7 @@ public class OrderAgent extends BaseAgent {
         CourseTimeParams times = calculateCourseTimes(courseStates.indexOf(courseState));
 
         List<Long> tasksToReplan = new ArrayList<>();
-        for (Long plannedId : courseState.plannedTaskIds) {
+        /*for (Long plannedId : courseState.plannedTaskIds) {
             if (plannedId == taskId) continue;
 
             CookingTask pt = taskRepository.findById(plannedId).orElse(null);
@@ -517,6 +518,22 @@ public class OrderAgent extends BaseAgent {
                     && pt.getPlannedEndTime().isBefore(times.targetEndTime.minusSeconds(
                     props.getPlanning().getJitAlignmentBufferSeconds()))) {
                 tasksToReplan.add(plannedId);
+            }
+        }*/
+
+        // Проверяем ВСЕ запланированные задачи курса, включая только что добавленную
+        for (Long plannedId : courseState.plannedTaskIds) {
+            CookingTask pt = taskRepository.findById(plannedId).orElse(null);
+            if (pt == null) continue;
+            if (pt.getStatus() == CookingTaskStatus.IN_PROGRESS
+                    || pt.getStatus() == CookingTaskStatus.DONE) continue;
+
+            if (pt.getPlannedEndTime() != null) {
+                long diffMinutes = ChronoUnit.MINUTES.between(
+                        pt.getPlannedEndTime(), times.targetEndTime);
+                if (diffMinutes >= 1) {
+                    tasksToReplan.add(plannedId);
+                }
             }
         }
 

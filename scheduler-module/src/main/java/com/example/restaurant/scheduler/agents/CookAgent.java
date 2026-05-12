@@ -110,7 +110,8 @@ public class CookAgent extends BaseAgent {
      * @return список вариантов (может быть пустым)
      */
     private List<PlacementVariant> buildVariants(ParamsRequestBody request) {
-        List<PlacementVariant> variants = new ArrayList<>();
+        // Старый алгоритм с неэффективным распределением задач.
+        /*List<PlacementVariant> variants = new ArrayList<>();
 
         int duration = request.getDurationMinutes();
         LocalDateTime notBefore = request.getNotBefore();
@@ -159,6 +160,100 @@ public class CookAgent extends BaseAgent {
             PlacementVariant conflictVariant = buildConflictVariant(request, duration, notBefore, deadline);
             if (conflictVariant != null) {
                 variants.add(conflictVariant);
+            }
+        }
+
+        return variants;*/
+
+        List<PlacementVariant> variants = new ArrayList<>();
+
+        int duration = request.getDurationMinutes();
+        LocalDateTime globalNotBefore = request.getNotBefore();  // глобальный notBefore курса
+        LocalDateTime targetEndTime   = request.getTargetEndTime();
+        LocalDateTime deadline        = request.getDeadline();
+        LocalDateTime now             = LocalDateTime.now();
+
+        // ---------------------------------------------------------------
+        // Вычисляем фактическое время освобождения повара.
+        //
+        // findAsapSlot(0, now) — ищем ближайший момент, когда повар
+        // свободен, начиная прямо сейчас (задача нулевой длины).
+        // Если повар уже свободен (нет слотов после now) — вернёт now.
+        // Если занят до 19:27 — вернёт 19:27.
+        // ---------------------------------------------------------------
+        LocalDateTime cookFreeTime = schedule.findAsapSlot(0, now);
+
+        // ---------------------------------------------------------------
+        // Эффективный notBefore для ASAP.
+        //
+        // Берём более раннее из двух:
+        //   - фактическое время освобождения повара (cookFreeTime)
+        //   - глобальный notBefore курса (globalNotBefore)
+        //
+        // Пример:
+        //   globalNotBefore = 19:21, cookFreeTime = 19:20 → effective = 19:20
+        //   globalNotBefore = 19:21, cookFreeTime = 19:27 → effective = 19:21
+        //
+        // Зачем нужен globalNotBefore как нижняя граница для JIT?
+        // JIT = targetEndTime − duration. Это не зависит от notBefore,
+        // поэтому для JIT мы по-прежнему используем globalNotBefore
+        // (чтобы JIT не уезжал раньше, чем предыдущий курс мог закончиться).
+        // ---------------------------------------------------------------
+        LocalDateTime effectiveNotBefore = cookFreeTime.isBefore(globalNotBefore)
+                ? cookFreeTime
+                : globalNotBefore;
+
+        // На всякий случай: не уходим в прошлое
+        if (effectiveNotBefore.isBefore(now)) {
+            effectiveNotBefore = now;
+        }
+
+        // ---------------------------------------------------------------
+        // Шаг 1: ASAP-вариант — используем effectiveNotBefore
+        //
+        // COOK_1 (свободен 19:20): ASAP = 19:21 (зажали до now)
+        // COOK_3 (занят до 19:27): ASAP = 19:27
+        // ---------------------------------------------------------------
+        LocalDateTime asapStart = schedule.findAsapSlot(duration, effectiveNotBefore);
+        LocalDateTime asapEnd   = asapStart.plusMinutes(duration);
+
+        if (!asapEnd.isAfter(deadline)) {
+            variants.add(new PlacementVariant(agentId, "asap", asapStart, asapEnd, null));
+            log.debug("{}: ASAP для задачи {}: [{} → {}]",
+                    agentId, request.getTaskId(), asapStart, asapEnd);
+        }
+
+        // ---------------------------------------------------------------
+        // Шаг 2: JIT-вариант — используем globalNotBefore
+        //
+        // JIT = targetEndTime − duration. Это не зависит от effectiveNotBefore.
+        // Для JIT нижняя граница — globalNotBefore, а не effectiveNotBefore:
+        // повар не должен начинать раньше, чем предыдущий курс мог
+        // теоретически завершиться.
+        //
+        // Пример: prevEnd = 19:27, syncGap = 5, targetEndTime = 19:32,
+        // duration = 15 → jitStart = 19:17 < now(19:21) → findJitSlot вернёт null.
+        // Это правильно: JIT недостижим, повар предложит только ASAP.
+        // ---------------------------------------------------------------
+        LocalDateTime jitStart = schedule.findJitSlot(duration, targetEndTime, globalNotBefore);
+
+        if (jitStart != null && !jitStart.equals(asapStart)) {
+            LocalDateTime jitEnd = jitStart.plusMinutes(duration);
+            variants.add(new PlacementVariant(agentId, "jit", jitStart, jitEnd, null));
+            log.debug("{}: JIT для задачи {}: [{} → {}]",
+                    agentId, request.getTaskId(), jitStart, jitEnd);
+        }
+
+        // ---------------------------------------------------------------
+        // Шаг 3: CONFLICT-вариант — используем effectiveNotBefore
+        //
+        // Только если ни ASAP ни JIT не уложились в deadline.
+        // ---------------------------------------------------------------
+        if (variants.isEmpty()) {
+            PlacementVariant conflict = buildConflictVariant(
+                    request, duration, effectiveNotBefore, deadline);
+            if (conflict != null) {
+                variants.add(conflict);
             }
         }
 

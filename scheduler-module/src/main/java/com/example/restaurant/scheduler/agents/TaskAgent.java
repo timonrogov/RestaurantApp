@@ -3,6 +3,7 @@ package com.example.restaurant.scheduler.agents;
 import com.example.restaurant.enums.CookingTaskStatus;
 import com.example.restaurant.models.CookingTask;
 import com.example.restaurant.repositories.CookingTaskRepository;
+import com.example.restaurant.scheduler.config.SchedulerProperties;
 import com.example.restaurant.scheduler.messages.Message;
 import com.example.restaurant.scheduler.messages.MessageType;
 import com.example.restaurant.scheduler.messages.dto.*;
@@ -28,16 +29,6 @@ import java.util.List;
  * ID агента: "TASK_{cookingTask.id}", например "TASK_42".
  */
 public class TaskAgent extends BaseAgent {
-
-    /** Максимальное число перепланирований до признания задачи провалившейся. */
-    private static final int MAX_REPLAN = 3;
-
-    /**
-     * Размер временного окна в минутах для расчёта оценок.
-     * Используется при нормализации urgencyScore и speedScore.
-     * Смысл: оцениваем варианты в окне [notBefore, notBefore + SCORING_WINDOW].
-     */
-    private static final int SCORING_WINDOW_MINUTES = 120;
 
     // -----------------------------------------------------------------------
     // Конфигурация задачи
@@ -89,6 +80,9 @@ public class TaskAgent extends BaseAgent {
     /** Счётчик перепланирований (увеличивается при REMOVE_TASK). */
     private int replanCount = 0;
 
+    // ДОБАВИТЬ:
+    private final SchedulerProperties props;
+
     // -----------------------------------------------------------------------
     // Конструктор
     // -----------------------------------------------------------------------
@@ -96,13 +90,15 @@ public class TaskAgent extends BaseAgent {
     public TaskAgent(CookingTask task,
                      String orderAgentId,
                      SceneAgent sceneAgent,
-                     CookingTaskRepository taskRepository) {
+                     CookingTaskRepository taskRepository,
+                     SchedulerProperties props) {
         super("TASK_" + task.getId());
         this.task = task;
         this.orderAgentId = orderAgentId;
         this.sceneAgent = sceneAgent;
         this.taskRepository = taskRepository;
         this.equipmentNeeded = task.getTemplate().getRequiredEquipmentType() != null;
+        this.props = props;
     }
 
     // -----------------------------------------------------------------------
@@ -244,7 +240,7 @@ public class TaskAgent extends BaseAgent {
 
         if (collectedVariants.isEmpty()) {
             log.warn("{}: ни один повар не предложил вариантов", agentId);
-            if (replanCount >= MAX_REPLAN) {
+            if (replanCount >= props.getPlanning().getMaxReplan()) {
                 failTask();
             } else {
                 startNegotiations();
@@ -259,7 +255,7 @@ public class TaskAgent extends BaseAgent {
 
         if (viable.isEmpty()) {
             log.warn("{}: после фильтрации по дедлайну вариантов нет", agentId);
-            if (replanCount >= MAX_REPLAN) {
+            if (replanCount >= props.getPlanning().getMaxReplan()) {
                 failTask();
                 return;
             }
@@ -267,14 +263,16 @@ public class TaskAgent extends BaseAgent {
             return;
         }
 
-        long windowMinutes = SCORING_WINDOW_MINUTES;
+        long windowMinutes = props.getScoring().getWindowMinutes();;
 
         for (PlacementVariant variant : viable) {
             double syncScore  = computeSyncScore(variant.getEndTime());
             double speedScore = computeSpeedScore(variant.getStartTime(), windowMinutes);
             double loadScore  = computeLoadScore(variant.getResourceAgentId());
 
-            double total = 0.6 * syncScore + 0.2 * speedScore + 0.2 * loadScore;
+            double total = props.getScoring().getWeightSync()  * syncScore
+                    + props.getScoring().getWeightSpeed() * speedScore
+                    + props.getScoring().getWeightLoad()  * loadScore;
 
             variant.setUrgencyScore(syncScore);
             variant.setSpeedScore(speedScore);
@@ -308,8 +306,8 @@ public class TaskAgent extends BaseAgent {
      */
     private double computeSyncScore(LocalDateTime endTime) {
         long diffMinutes = Math.abs(ChronoUnit.MINUTES.between(endTime, targetEndTime));
-        // 60 минут — окно чувствительности. Если разница больше часа, оценка 0.
-        return Math.max(0.0, 1.0 - (double) diffMinutes / 60.0);
+        return Math.max(0.0, 1.0 - (double) diffMinutes
+                / props.getScoring().getSyncSensitivityMinutes());
     }
 
     /**
@@ -332,13 +330,19 @@ public class TaskAgent extends BaseAgent {
      * cookAgentId имеет формат "COOK_{id}" — извлекаем числовой ID.
      */
     private double computeLoadScore(String cookAgentId) {
+        double windowMinutesForNormalize = props.getScoring().getLoadWindowMinutes();
         try {
             long cookId = Long.parseLong(cookAgentId.replace("COOK_", ""));
             CookSchedule schedule = sceneAgent.getCookSchedule(cookId);
-            if (schedule == null) return 0.5; // нет данных — нейтральная оценка
-            return 1.0 - schedule.getOccupancyRate(60);
+            if (schedule == null) return 0.5;
+
+            // Когда повар свободен в следующий раз (начиная с notBefore)?
+            LocalDateTime asapFree = schedule.findAsapSlot(0, notBefore);
+            // Чем раньше освобождается — тем лучше (нормализуем по окну 60 мин)
+            long minutesUntilFree = ChronoUnit.MINUTES.between(notBefore, asapFree);
+            if (minutesUntilFree < 0) return 1.0;
+            return Math.max(0.0, 1.0 - (double) minutesUntilFree / windowMinutesForNormalize);
         } catch (NumberFormatException e) {
-            // cookAgentId не повар (например, если вдруг попал агент оборудования)
             return 0.5;
         }
     }
@@ -354,7 +358,7 @@ public class TaskAgent extends BaseAgent {
     private void tryVariantAtIndex() {
         if (currentVariantIndex >= evaluatedVariants.size()) {
             log.warn("{}: все {} варианта исчерпаны", agentId, evaluatedVariants.size());
-            if (replanCount >= MAX_REPLAN) {
+            if (replanCount >= props.getPlanning().getMaxReplan()) {
                 failTask();
             } else {
                 startNegotiations();
@@ -637,7 +641,7 @@ public class TaskAgent extends BaseAgent {
         }
 
         replanCount++;
-        log.info("{}: получен REMOVE_TASK (replanCount={}/{})", agentId, replanCount, MAX_REPLAN);
+        log.info("{}: получен REMOVE_TASK (replanCount={}/{})", agentId, replanCount, props.getPlanning().getMaxReplan());
 
         task.setStatus(CookingTaskStatus.PENDING);
         task.setPlannedStartTime(null);
@@ -648,8 +652,8 @@ public class TaskAgent extends BaseAgent {
         task.setLocalOverdue(false);
         taskRepository.save(task);
 
-        if (replanCount > MAX_REPLAN) {
-            log.warn("{}: превышен лимит перепланирований ({})", agentId, MAX_REPLAN);
+        if (replanCount > props.getPlanning().getMaxReplan()) {
+            log.warn("{}: превышен лимит перепланирований ({})", agentId, props.getPlanning().getMaxReplan());
             failTask();
             return;
         }

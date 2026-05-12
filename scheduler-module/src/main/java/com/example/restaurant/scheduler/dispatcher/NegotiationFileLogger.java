@@ -1,5 +1,6 @@
 package com.example.restaurant.scheduler.dispatcher;
 
+import com.example.restaurant.scheduler.config.SchedulerProperties;
 import com.example.restaurant.scheduler.messages.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,16 +24,27 @@ public class NegotiationFileLogger {
     private static final Logger log = LoggerFactory.getLogger(NegotiationFileLogger.class);
 
     // Файл будет создан в корне твоего проекта
-    private final Path logFilePath = Paths.get("negotiations_log.txt");
+    private Path logFilePath;
     private final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
 
-    public NegotiationFileLogger() {
-        try {
-            // При каждом старте сервера очищаем файл, чтобы лог был свежим.
-            // Если хочешь сохранять историю навсегда, удали эти две строки.
-            Files.deleteIfExists(logFilePath);
-            Files.createFile(logFilePath);
+    private final SchedulerProperties props;
 
+    public NegotiationFileLogger(SchedulerProperties props) {  // ← ДОБАВИТЬ параметр
+        this.props = props;
+        if (!props.getLogger().isEnabled()) {
+            return;   // логгер выключен — ничего не создаём
+        }
+
+        // Путь из конфигурации (не хардкод)
+        this.logFilePath = Paths.get(props.getLogger().getFilePath());
+
+        try {
+            if (props.getLogger().isClearOnStart()) {
+                Files.deleteIfExists(logFilePath);
+                Files.createFile(logFilePath);
+            } else if (!Files.exists(logFilePath)) {
+                Files.createFile(logFilePath);
+            }
             writeLine("=== СТАРТ СИСТЕМЫ ПЛАНИРОВАНИЯ: " + LocalDateTime.now() + " ===\n");
         } catch (IOException e) {
             log.error("Не удалось создать файл лога переговоров", e);
@@ -43,6 +55,7 @@ public class NegotiationFileLogger {
      * Записывает одно сообщение в файл.
      */
     public void logCommunication(Message message, String recipientId) {
+        if (!props.getLogger().isEnabled()) return;
         String timestamp = LocalDateTime.now().format(timeFormatter);
 
         // Форматируем тело сообщения

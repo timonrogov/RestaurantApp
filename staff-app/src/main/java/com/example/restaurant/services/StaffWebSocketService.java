@@ -11,8 +11,10 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -120,27 +122,55 @@ public class StaffWebSocketService {
     @Scheduled(fixedRate = 5000)
     @Transactional(readOnly = true)
     public void pollOrdersAndTasks() {
+        // 1. Берём ID всех заказов, которые мы уже отслеживаем в кеше
+        Set<Long> idsToCheck = new HashSet<>(lastKnownOrderStatuses.keySet());
+
+        // 2. Добавляем ID всех текущих активных заказов
         List<Order> activeOrders = orderRepository.findByStatusNotIn(
                 List.of(OrderStatus.ASSEMBLY, OrderStatus.SERVED, OrderStatus.CANCELED)
         );
+        for (Order o : activeOrders) {
+            idsToCheck.add(o.getId());
+        }
+
+        if (idsToCheck.isEmpty()) return;
+
+        // 3. Загружаем все нужные заказы одним запросом
+        List<Order> ordersToCheck = orderRepository.findAllById(idsToCheck);
 
         boolean ordersChanged = false;
-        for (Order order : activeOrders) {
+        for (Order order : ordersToCheck) {
             OrderStatus currentStatus = order.getStatus();
             OrderStatus previousStatus = lastKnownOrderStatuses.put(order.getId(), currentStatus);
 
-            if (previousStatus != null && currentStatus != previousStatus) {
+            if (previousStatus == null) {
+                // Новый заказ появился в кеше
                 ordersChanged = true;
-                notifyOrderUpdate(order.getId(), order.getTableNumber(), currentStatus.name(), currentStatus.getDisplayName());
-            } else if (previousStatus == null) {
-                // Если появился новый заказ
+            } else if (currentStatus != previousStatus) {
+                // Статус изменился — уведомляем страницу заказов
                 ordersChanged = true;
+                notifyOrderUpdate(
+                        order.getId(),
+                        order.getTableNumber() != null ? order.getTableNumber() : "—",
+                        currentStatus.name(),
+                        currentStatus.getDisplayName()
+                );
+                // Заказ подан — посылаем специальный сигнал для KDS
+                if (currentStatus == OrderStatus.SERVED) {
+                    notifyKdsOrderServed(order.getId());
+                }
             }
         }
 
+        // 4. Чистим кеш от завершённых заказов
+        lastKnownOrderStatuses.keySet().removeIf(id -> {
+            OrderStatus status = lastKnownOrderStatuses.get(id);
+            return status == OrderStatus.SERVED || status == OrderStatus.CANCELED;
+        });
+
         if (ordersChanged) {
             notifySchedulerUpdate();
-            notifyKdsUpdate(); // Дергаем KDS, потому что могли сгенерироваться новые задачи от планировщика!
+            notifyKdsUpdate();
         }
     }
 

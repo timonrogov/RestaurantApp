@@ -42,9 +42,12 @@ public class EquipmentTypeSchedule {
     /** Список всех занятых слотов этого типа оборудования. */
     private final List<ScheduleSlot> slots = new ArrayList<>();
 
-    public EquipmentTypeSchedule(String equipmentType, int totalCapacity) {
+    private final int equipmentSlotMaxIters;
+
+    public EquipmentTypeSchedule(String equipmentType, int totalCapacity, int equipmentSlotMaxIters) {
         this.equipmentType = equipmentType;
         this.totalCapacity = totalCapacity;
+        this.equipmentSlotMaxIters = equipmentSlotMaxIters;
     }
 
     // -----------------------------------------------------------------------
@@ -91,7 +94,7 @@ public class EquipmentTypeSchedule {
 
         // Защита от бесконечного цикла: максимум 1000 итераций
         // (на практике их будет 2-3, это просто страховка)
-        for (int i = 0; i < 1000; i++) {
+        for (int i = 0; i < equipmentSlotMaxIters; i++) {
             LocalDateTime candidateEnd = candidateStart.plusMinutes(durationMinutes);
 
             if (isAvailable(candidateStart, candidateEnd)) {

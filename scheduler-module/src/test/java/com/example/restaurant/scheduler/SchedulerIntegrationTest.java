@@ -5,6 +5,7 @@ import com.example.restaurant.enums.CookingTaskStatus;
 import com.example.restaurant.models.*;
 import com.example.restaurant.repositories.*;
 import com.example.restaurant.scheduler.agents.*;
+import com.example.restaurant.scheduler.config.SchedulerProperties;
 import com.example.restaurant.scheduler.dispatcher.DispatcherAgent;
 import com.example.restaurant.scheduler.dispatcher.MessageBus;
 import com.example.restaurant.scheduler.dispatcher.NegotiationFileLogger;
@@ -52,10 +53,13 @@ class SchedulerIntegrationTest {
     private Map<Long, CookingTask> fakeTaskDb;
     private long taskIdCounter;
 
+    private SchedulerProperties props;
+
     @BeforeEach
     void setUp() {
         // 1. Создаём шину сообщений
-        messageBus = new MessageBus(fileLogger);
+        props = SchedulerProperties.defaults();
+        messageBus = new MessageBus(fileLogger, props);
 
         // 2. Мокируем все репозитории (Создаем их!)
         taskRepository       = mock(CookingTaskRepository.class);
@@ -107,7 +111,8 @@ class SchedulerIntegrationTest {
                 .thenReturn(List.of());
 
         // 8. Создаём и регистрируем DispatcherAgent
-        dispatcher = new DispatcherAgent(messageBus, taskRepository, templateRepository, orderCourseRepository, orderRepository);
+        dispatcher = new DispatcherAgent(messageBus, taskRepository, templateRepository,
+                orderCourseRepository, orderRepository, props);
         messageBus.register(dispatcher);
     }
 
@@ -141,7 +146,7 @@ class SchedulerIntegrationTest {
 
         // Act
         OrderAgent orderAgent = new OrderAgent(order, sceneAgent, taskRepository,
-                templateRepository, orderCourseRepository);
+                templateRepository, orderCourseRepository, props);
         messageBus.register(orderAgent);
 
         dispatcher.initialize(List.of(cookProfile), List.of());

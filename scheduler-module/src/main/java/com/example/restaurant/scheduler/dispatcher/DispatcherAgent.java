@@ -14,6 +14,7 @@ import com.example.restaurant.scheduler.agents.CookAgent;
 import com.example.restaurant.scheduler.agents.EquipmentTypeAgent;
 import com.example.restaurant.scheduler.agents.OrderAgent;
 import com.example.restaurant.scheduler.agents.SceneAgent;
+import com.example.restaurant.scheduler.config.SchedulerProperties;
 import com.example.restaurant.scheduler.messages.Message;
 import com.example.restaurant.scheduler.messages.MessageType;
 import com.example.restaurant.scheduler.schedule.CookSchedule;
@@ -71,6 +72,8 @@ public class DispatcherAgent extends BaseAgent {
     private final OrderCourseRepository orderCourseRepository;
     private final OrderRepository orderRepository;
 
+    private final SchedulerProperties props;
+
     // -----------------------------------------------------------------------
     // Конструктор
     // -----------------------------------------------------------------------
@@ -79,13 +82,15 @@ public class DispatcherAgent extends BaseAgent {
                            CookingTaskRepository taskRepository,
                            CookingTaskTemplateRepository templateRepository,
                            OrderCourseRepository orderCourseRepository,
-                           OrderRepository orderRepository) {
+                           OrderRepository orderRepository,
+                           SchedulerProperties props) {
         super(AGENT_ID);
         this.messageBus = messageBus;
         this.taskRepository = taskRepository;
         this.templateRepository = templateRepository;
         this.orderCourseRepository = orderCourseRepository;
         this.orderRepository = orderRepository;
+        this.props = props;
     }
 
     // -----------------------------------------------------------------------
@@ -168,7 +173,9 @@ public class DispatcherAgent extends BaseAgent {
             String type = entry.getKey();
             int totalCapacity = entry.getValue();
 
-            EquipmentTypeSchedule schedule = new EquipmentTypeSchedule(type, totalCapacity);
+            EquipmentTypeSchedule schedule = new EquipmentTypeSchedule(
+                    type, totalCapacity,
+                    props.getMessageBus().getEquipmentSlotMaxIters());
             EquipmentTypeAgent agent = new EquipmentTypeAgent(type, schedule);
             messageBus.register(agent);
             sceneAgent.registerEquipmentTypeAgent(agent, schedule);
@@ -201,7 +208,8 @@ public class DispatcherAgent extends BaseAgent {
                 sceneAgent,
                 taskRepository,
                 templateRepository,
-                orderCourseRepository
+                orderCourseRepository,
+                props
         );
 
         messageBus.register(orderAgent);
@@ -252,8 +260,23 @@ public class DispatcherAgent extends BaseAgent {
             freedEquipSlots += equipAgent.getSchedule().removeSlotsByOrderId(orderId);
         }
 
-        log.info("{}: заказ #{} отменён. Освобождено слотов поваров: {}, оборудования: {}",
-                agentId, orderId, freedCookSlots, freedEquipSlots);
+        // Снимаем с регистрации все TaskAgent-ы этого заказа.
+        // Это прекращает любые незавершённые переговоры: TaskAgent-ы, находящиеся
+        // в процессе торга, при попытке отправить следующее сообщение получат
+        // предупреждение от MessageBus («получатель не найден») и остановятся.
+        // taskRepository.findByOrderId() — метод уже существует в репозитории.
+        List<com.example.restaurant.models.CookingTask> orderTasks =
+                taskRepository.findByOrderId(orderId);
+        int unregisteredTaskAgents = 0;
+        for (com.example.restaurant.models.CookingTask task : orderTasks) {
+            String taskAgentId = "TASK_" + task.getId();
+            messageBus.unregister(taskAgentId);
+            unregisteredTaskAgents++;
+        }
+
+        log.info("{}: заказ #{} отменён. Освобождено слотов поваров: {}, оборудования: {}. " +
+                        "Снято TaskAgent-ов: {}",
+                agentId, orderId, freedCookSlots, freedEquipSlots, unregisteredTaskAgents);
     }
 
     /**
@@ -453,7 +476,9 @@ public class DispatcherAgent extends BaseAgent {
                     agentId, type, capacity);
         } else {
             // Абсолютно новый тип оборудования
-            EquipmentTypeSchedule schedule = new EquipmentTypeSchedule(type, capacity);
+            EquipmentTypeSchedule schedule = new EquipmentTypeSchedule(
+                    type, capacity,
+                    props.getMessageBus().getEquipmentSlotMaxIters());
             EquipmentTypeAgent agent = new EquipmentTypeAgent(type, schedule);
             messageBus.register(agent);
             sceneAgent.registerEquipmentTypeAgent(agent, schedule);

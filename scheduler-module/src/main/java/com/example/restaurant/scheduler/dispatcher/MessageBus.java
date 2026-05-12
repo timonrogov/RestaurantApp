@@ -1,6 +1,7 @@
 package com.example.restaurant.scheduler.dispatcher;
 
 import com.example.restaurant.scheduler.agents.BaseAgent;
+import com.example.restaurant.scheduler.config.SchedulerProperties;
 import com.example.restaurant.scheduler.messages.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,8 +41,11 @@ public class MessageBus {
 
     private final NegotiationFileLogger fileLogger;
 
-    public MessageBus(NegotiationFileLogger fileLogger) {
+    private final SchedulerProperties props;
+
+    public MessageBus(NegotiationFileLogger fileLogger, SchedulerProperties props) {
         this.fileLogger = fileLogger;
+        this.props = props;
     }
 
     // -----------------------------------------------------------------------
@@ -94,7 +98,7 @@ public class MessageBus {
      * (через deliver). Они встанут в хвост и тоже будут обработаны в этом вызове.
      */
     public synchronized void processAll() {
-        final int MAX_ITERATIONS = 10_000;
+        final int MAX_ITERATIONS = props.getMessageBus().getMaxIterations();;
         int iterations = 0;
 
         log.debug("Начало обработки очереди сообщений, размер: {}", queue.size());

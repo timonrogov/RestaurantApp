@@ -13,8 +13,13 @@
 
     <!-- Стили конкретно для этой страницы -->
     <link rel="stylesheet" th:href="@{/css/order-details.css}">
+
+    <!-- SockJS + STOMP для WebSocket -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
 </head>
-<body>
+
+<body th:attr="data-order-id=${order.id}">
 
 <!-- Шапка сайта -->
 <div th:replace="fragments/header :: header"></div>
@@ -126,7 +131,6 @@
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
 <script th:src="@{/js/common.js}"></script>
-<!-- Если скрипт order-details.js пустой, его можно убрать или оставить на будущее -->
-<!-- <script th:src="@{/js/order-details.js}"></script> -->
+<script th:src="@{/js/order-details.js}"></script>
 </body>
 </html>

@@ -6,8 +6,10 @@ import com.example.restaurant.repositories.OrderCourseRepository;
 import com.example.restaurant.repositories.OrderRepository;
 import com.example.restaurant.scheduler.dispatcher.DispatcherAgent;
 import com.example.restaurant.scheduler.dispatcher.MessageBus;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.PropertySource;
 
 /**
  * Spring-конфигурация планировщика.
@@ -16,6 +18,8 @@ import org.springframework.context.annotation.Configuration;
  * @Component — Spring создаёт его автоматически и инжектирует сюда.
  */
 @Configuration
+@PropertySource("classpath:scheduler.properties")
+//@EnableConfigurationProperties(SchedulerProperties.class)
 public class SchedulerConfig {
 
     @Bean
@@ -23,13 +27,15 @@ public class SchedulerConfig {
                                            CookingTaskRepository taskRepository,
                                            CookingTaskTemplateRepository templateRepository,
                                            OrderCourseRepository orderCourseRepository,
-                                           OrderRepository orderRepository) {
+                                           OrderRepository orderRepository,
+                                           SchedulerProperties schedulerProperties) {
         return new DispatcherAgent(
                 messageBus,
                 taskRepository,
                 templateRepository,
                 orderCourseRepository,
-                orderRepository
+                orderRepository,
+                schedulerProperties
         );
     }
 }

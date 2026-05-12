@@ -11,6 +11,7 @@ import com.example.restaurant.repositories.CookProfileRepository;
 import com.example.restaurant.repositories.CookingTaskRepository;
 import com.example.restaurant.repositories.EquipmentRepository;
 import com.example.restaurant.repositories.OrderRepository;
+import com.example.restaurant.scheduler.config.SchedulerProperties;
 import com.example.restaurant.scheduler.dispatcher.DispatcherAgent;
 import com.example.restaurant.scheduler.dispatcher.MessageBus;
 import com.example.restaurant.scheduler.messages.Message;
@@ -56,13 +57,6 @@ public class SchedulerService {
 
     private static final Logger log = LoggerFactory.getLogger(SchedulerService.class);
 
-    /**
-     * Если повар закончил задачу раньше чем на это количество минут — считаем
-     * это значимым досрочным завершением и сдвигаем последующие задачи назад.
-     * Значение 5 даёт небольшой буфер: мелкое расхождение не вызывает лишних сдвигов.
-     */
-    private static final int EARLY_FINISH_THRESHOLD_MINUTES = 0;
-
     private final DispatcherAgent dispatcher;
     private final MessageBus messageBus;
     private final CookProfileRepository cookProfileRepository;
@@ -71,6 +65,7 @@ public class SchedulerService {
     private final OrderRepository orderRepository;
     private final OrderService orderService;
     private final ApplicationEventPublisher eventPublisher;
+    private final SchedulerProperties schedulerProperties;
 
     // -----------------------------------------------------------------------
     // Инициализация при старте
@@ -120,10 +115,17 @@ public class SchedulerService {
                     event.getOrderId());
             scheduleOrder(event.getOrderId());
 
-        } else if (event.getNewStatus() == OrderStatus.CANCELED) {
-            log.info("SchedulerService: заказ #{} → CANCELED, освобождаем ресурсы",
-                    event.getOrderId());
+        } else if (event.getNewStatus() == OrderStatus.CANCELED
+                || event.getNewStatus() == OrderStatus.SERVED) {
+            log.info("SchedulerService: заказ #{} → {}, отменяем задачи и освобождаем ресурсы",
+                    event.getOrderId(), event.getNewStatus());
+            // Шаг 1: обновить статусы CookingTask в БД — повара перестанут видеть задачи на KDS
+            terminateOrderTasks(event.getOrderId());
+            // Шаг 2: очистить in-memory расписания и снять агентов с регистрации
             cancelOrder(event.getOrderId());
+        } else if (event.getNewStatus() == OrderStatus.READY) {   // ← НОВЫЙ БЛОК
+            completeOrderTasks(event.getOrderId());    // → DONE
+            cancelOrder(event.getOrderId());           // освободить in-memory ресурсы
         }
     }
 
@@ -153,6 +155,91 @@ public class SchedulerService {
      */
     public void cancelOrder(Long orderId) {
         dispatchAndProcess(MessageType.ORDER_CANCELLED, orderId);
+    }
+
+    /**
+     * Перевести все незавершённые задачи заказа в статус CANCELLED.
+     *
+     * Вызывается при принудительном завершении (SERVED) или отмене (CANCELED)
+     * заказа администратором. Гарантирует, что:
+     *   — задачи исчезают с KDS-экрана поваров немедленно после смены статуса заказа;
+     *   — задачи в финальных статусах (DONE, CANCELLED) не затрагиваются.
+     *
+     * Порядок вызова важен: этот метод должен вызываться ДО cancelOrder(),
+     * чтобы данные в БД были актуальны до того, как агенты начнут снятие с регистрации.
+     *
+     * @param orderId ID заказа, чьи задачи нужно отменить
+     */
+    @Transactional
+    public void terminateOrderTasks(Long orderId) {
+        List<CookingTask> tasks = cookingTaskRepository.findByOrderId(orderId);
+
+        if (tasks.isEmpty()) {
+            log.info("SchedulerService: заказ #{} не имеет задач планировщика — ничего отменять не нужно",
+                    orderId);
+            return;
+        }
+
+        List<CookingTask> toCancel = tasks.stream()
+                .filter(t -> t.getStatus() != CookingTaskStatus.DONE
+                        && t.getStatus() != CookingTaskStatus.CANCELLED)
+                .toList();
+
+        if (toCancel.isEmpty()) {
+            log.info("SchedulerService: все {} задач заказа #{} уже в финальном статусе",
+                    tasks.size(), orderId);
+            return;
+        }
+
+        for (CookingTask task : toCancel) {
+            task.setStatus(CookingTaskStatus.CANCELLED);
+        }
+        cookingTaskRepository.saveAll(toCancel);
+
+        log.info("SchedulerService: заказ #{} — отменено {}/{} задач планировщика",
+                orderId, toCancel.size(), tasks.size());
+    }
+
+    /**
+     * Перевести все незавершённые задачи заказа в статус DONE.
+     *
+     * Вызывается когда администратор вручную переводит заказ в статус READY,
+     * не дожидаясь пока все повара нажмут «Готово» на KDS.
+     *
+     * Если заказ перешёл в READY автоматически (все задачи уже DONE),
+     * метод ничего не делает — это безопасно.
+     *
+     * @param orderId ID заказа
+     */
+    @Transactional
+    public void completeOrderTasks(Long orderId) {
+        List<CookingTask> tasks = cookingTaskRepository.findByOrderId(orderId);
+
+        List<CookingTask> toComplete = tasks.stream()
+                .filter(t -> t.getStatus() != CookingTaskStatus.DONE
+                        && t.getStatus() != CookingTaskStatus.CANCELLED)
+                .toList();
+
+        if (toComplete.isEmpty()) {
+            log.info("SchedulerService: заказ #{} — все задачи уже в финальном статусе", orderId);
+            return;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        for (CookingTask task : toComplete) {
+            task.setStatus(CookingTaskStatus.DONE);
+            task.setActualEndTime(now);
+            // Если задача так и не была начата — ставим actualStart тоже в now.
+            // Тогда JS возьмёт actualStart вместо plannedStart и нарисует
+            // полосу в текущем моменте, а не в будущем.
+            if (task.getActualStartTime() == null) {
+                task.setActualStartTime(now);
+            }
+        }
+        cookingTaskRepository.saveAll(toComplete);
+
+        log.info("SchedulerService: заказ #{} — принудительно завершено {}/{} задач",
+                orderId, toComplete.size(), tasks.size());
     }
 
     // -----------------------------------------------------------------------
@@ -292,7 +379,7 @@ public class SchedulerService {
         // Шаг 3: если закончил значительно раньше — сдвинуть следующие задачи
         if (task.getPlannedEndTime() != null) {
             long earlyMinutes = ChronoUnit.MINUTES.between(actualEnd, task.getPlannedEndTime());
-            if (earlyMinutes > EARLY_FINISH_THRESHOLD_MINUTES) {
+            if (earlyMinutes > schedulerProperties.getAdaptive().getEarlyFinishThresholdMinutes()) {
                 log.info("SchedulerService: задача #{} завершена на {} мин раньше — " +
                         "сдвигаем последующие задачи", taskId, earlyMinutes);
                 // Отрицательное значение = сдвиг назад
@@ -378,7 +465,7 @@ public class SchedulerService {
      * Крон только фиксирует факт задержки в БД и публикует событие.
      * Всю волну перепланирований берет на себя мультиагентная система.
      */
-    @Scheduled(cron = "0 * * * * *")
+    @Scheduled(cron = "#{@schedulerProperties.adaptive.delayDetectCron}")
     @Transactional
     public void detectAndReportDelays() {
         LocalDateTime now = LocalDateTime.now();
@@ -396,7 +483,8 @@ public class SchedulerService {
             for (CookingTask task : overdueExecution) {
                 try {
                     LocalDateTime oldEndTime = task.getPlannedEndTime();
-                    int delayMinutes = (int) ChronoUnit.MINUTES.between(oldEndTime, now.plusMinutes(1));
+                    int ahead = schedulerProperties.getAdaptive().getAutoDelayAheadMinutes();
+                    int delayMinutes = (int) ChronoUnit.MINUTES.between(oldEndTime, now.plusMinutes(ahead));
                     if (delayMinutes <= 0) delayMinutes = 1;
 
                     task.setLocalOverdue(true);
@@ -442,7 +530,8 @@ public class SchedulerService {
             for (CookingTask task : overdueStart) {
                 try {
                     LocalDateTime oldStartTime = task.getPlannedStartTime();
-                    int delayMinutes = (int) ChronoUnit.MINUTES.between(oldStartTime, now.plusMinutes(1));
+                    int ahead = schedulerProperties.getAdaptive().getAutoDelayAheadMinutes();
+                    int delayMinutes = (int) ChronoUnit.MINUTES.between(oldStartTime, now.plusMinutes(ahead));
                     if (delayMinutes <= 0) delayMinutes = 1;
 
                     task.setLocalOverdue(true);
@@ -511,7 +600,7 @@ public class SchedulerService {
      * fixedDelay = 10 секунд: следующая проверка начинается через 10 сек ПОСЛЕ
      * окончания предыдущей, что исключает параллельный запуск.
      */
-    @Scheduled(fixedDelay = 10_000)
+    @Scheduled(fixedDelayString = "#{@schedulerProperties.adaptive.pendingOrdersPollMs}")
     public void schedulePendingOrders() {
         List<Long> unscheduledOrderIds = cookingTaskRepository.findCookingOrderIdsWithoutTasks();
 

@@ -109,12 +109,15 @@ public interface CookingTaskRepository extends JpaRepository<CookingTask, Long> 
      * @param dayEnd   конец рабочего дня  (например 2025-05-16T22:00)
      */
     @Query("""
-    SELECT t FROM CookingTask t
-    WHERE (t.plannedStartTime >= :dayStart AND t.plannedStartTime < :dayEnd)
-       OR (t.status = com.example.restaurant.enums.CookingTaskStatus.IN_PROGRESS
-           AND t.actualStartTime >= :dayStart AND t.actualStartTime < :dayEnd)
-    ORDER BY t.plannedStartTime ASC NULLS LAST
-    """)
+        SELECT t FROM CookingTask t
+        WHERE t.status != com.example.restaurant.enums.CookingTaskStatus.CANCELLED
+          AND (
+              (t.plannedStartTime >= :dayStart AND t.plannedStartTime < :dayEnd)
+              OR (t.status = com.example.restaurant.enums.CookingTaskStatus.IN_PROGRESS
+                  AND t.actualStartTime >= :dayStart AND t.actualStartTime < :dayEnd)
+          )
+        ORDER BY t.plannedStartTime ASC NULLS LAST
+        """)
     List<CookingTask> findForGantt(
             @Param("dayStart") LocalDateTime dayStart,
             @Param("dayEnd")   LocalDateTime dayEnd);

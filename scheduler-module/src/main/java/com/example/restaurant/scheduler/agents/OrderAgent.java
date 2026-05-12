@@ -9,6 +9,7 @@ import com.example.restaurant.models.CookingTaskTemplate;
 import com.example.restaurant.repositories.CookingTaskRepository;
 import com.example.restaurant.repositories.CookingTaskTemplateRepository;
 import com.example.restaurant.repositories.OrderCourseRepository;
+import com.example.restaurant.scheduler.config.SchedulerProperties;
 import com.example.restaurant.scheduler.messages.Message;
 import com.example.restaurant.scheduler.messages.MessageType;
 import com.example.restaurant.scheduler.messages.dto.InitTaskPayload;
@@ -50,13 +51,6 @@ public class OrderAgent extends BaseAgent {
     /** ID диспетчера — уведомляем его когда все курсы завершены. */
     private static final String DISPATCHER_AGENT_ID = "DISPATCHER";
 
-    /**
-     * Дедлайн для задач: как далеко вперёд планируем.
-     * Для учебного проекта используем фиксированное значение — 2 часа.
-     * В реальной системе дедлайн считался бы из ожиданий гостя.
-     */
-    private static final int PLANNING_HORIZON_MINUTES = 120;
-
     // -----------------------------------------------------------------------
     // Состояние планирования
     // -----------------------------------------------------------------------
@@ -80,6 +74,8 @@ public class OrderAgent extends BaseAgent {
      */
     private final Map<Long, String> taskIdToAgentId = new HashMap<>();
 
+    private final SchedulerProperties props;
+
     // -----------------------------------------------------------------------
     // Конструктор
     // -----------------------------------------------------------------------
@@ -88,13 +84,15 @@ public class OrderAgent extends BaseAgent {
                       SceneAgent sceneAgent,
                       CookingTaskRepository taskRepository,
                       CookingTaskTemplateRepository templateRepository,
-                      OrderCourseRepository orderCourseRepository) {
+                      OrderCourseRepository orderCourseRepository,
+                      SchedulerProperties props) {
         super("ORDER_" + order.getId());
         this.order = order;
         this.sceneAgent = sceneAgent;
         this.taskRepository = taskRepository;
         this.templateRepository = templateRepository;
         this.orderCourseRepository = orderCourseRepository;
+        this.props = props;
     }
 
     // -----------------------------------------------------------------------
@@ -304,8 +302,9 @@ public class OrderAgent extends BaseAgent {
                 // Если добавить +1 мин, мы потеряем часть выигрыша. Здесь нужна точность.
                 if (!current.firstPlanningDone) {
                     // Первое планирование — с буфером.
-                    notBefore = now.plusMinutes(1);
-                    targetEndTime = now.plusMinutes(1 + maxDuration);
+                    int buf = props.getPlanning().getFirstCourseBufferMinutes();
+                    notBefore = now.plusMinutes(buf);
+                    targetEndTime = now.plusMinutes(buf + maxDuration);
                 } else {
                     // Перепланирование — без буфера.
                     notBefore = now;
@@ -375,7 +374,7 @@ public class OrderAgent extends BaseAgent {
             }
         }
 
-        LocalDateTime deadline = targetEndTime.plusMinutes(PLANNING_HORIZON_MINUTES);
+        LocalDateTime deadline = targetEndTime.plusMinutes(props.getPlanning().getHorizonMinutes());
         return new CourseTimeParams(notBefore, targetEndTime, deadline);
     }
 
@@ -388,14 +387,22 @@ public class OrderAgent extends BaseAgent {
 
         List<CookingTask> tasks = taskRepository.findAllById(current.taskIds);
 
-        // Убрана сортировка по убыванию длительности.
+        // Сортировка по убыванию длительности (LPT — Longest Processing Time First).
         //
-        // Раньше задачи сортировались от самой длинной к самой короткой,
-        // и планировались по одной. Это создавало эффект «первый занял лучшего».
-        // Теперь порядок не важен — все задачи стартуют одновременно.
+        // MessageBus — однопоточная FIFO-очередь: задача, получившая INIT первой,
+        // завершает переговоры первой и бронирует лучшего повара первой.
+        // Чтобы самая длинная задача попала к наиболее раннему повару
+        // (что минимизирует makespan курса), её переговоры должны идти первыми.
+        //
+        // Это классический алгоритм LPT, адаптированный к мультиагентной архитектуре:
+        // каждый агент грамотно выбирает лучшего из оставшихся поваров,
+        // а порядок переговоров гарантирует, что «длинные» задачи имеют приоритет.
         List<CookingTask> tasksToPlan = tasks.stream()
                 .filter(t -> t.getStatus() == CookingTaskStatus.PENDING
                         || t.getStatus() == CookingTaskStatus.FAILED)
+                .sorted(Comparator.comparingInt(
+                        (CookingTask t) -> t.getTemplate().getDurationMinutes()
+                ).reversed())   // LPT: длинные задачи ведут переговоры первыми
                 .toList();
 
         // Актуализируем список уже запланированных задач (при перепланировании
@@ -451,7 +458,7 @@ public class OrderAgent extends BaseAgent {
             // или переиспользуем существующий (перепланирование).
             if (!taskIdToAgentId.containsKey(task.getId())) {
                 TaskAgent taskAgent = new TaskAgent(
-                        task, agentId, sceneAgent, taskRepository);
+                        task, agentId, sceneAgent, taskRepository, props);
                 messageBus.register(taskAgent);
                 taskIdToAgentId.put(task.getId(), taskAgent.getAgentId());
             }
@@ -507,8 +514,8 @@ public class OrderAgent extends BaseAgent {
             // Перепланируем только если задача заканчивается заметно раньше цели
             // (30-секундный буфер исключает бесконечные микроперепланирования).
             if (pt.getPlannedEndTime() != null
-                    && pt.getPlannedEndTime().isBefore(
-                    times.targetEndTime.minusSeconds(30))) {
+                    && pt.getPlannedEndTime().isBefore(times.targetEndTime.minusSeconds(
+                    props.getPlanning().getJitAlignmentBufferSeconds()))) {
                 tasksToReplan.add(plannedId);
             }
         }

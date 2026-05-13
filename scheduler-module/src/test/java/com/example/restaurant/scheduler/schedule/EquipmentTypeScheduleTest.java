@@ -22,7 +22,7 @@ class EquipmentTypeScheduleTest {
 
     @BeforeEach
     void setUp() {
-        schedule = new EquipmentTypeSchedule("OVEN", 2);
+        schedule = new EquipmentTypeSchedule("OVEN", 2, 2);
     }
 
     // -----------------------------------------------------------------------

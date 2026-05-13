@@ -84,4 +84,20 @@ public class CookingTaskTemplate {
      */
     @Column(name = "can_be_parallel", nullable = false)
     private boolean canBeParallel = false;
+
+    /**
+     * Количество порций, которые повар готовит за один «заход» на данном этапе.
+     *
+     * Используется OrderAgent при разбивке OrderItem на CookingTask-партии:
+     *   batchCount = ceil(orderItem.quantity / portionsPerSlot)
+     *
+     * Примеры:
+     *   portionsPerSlot = 1 → каждая порция — отдельная задача (дефолт)
+     *   portionsPerSlot = 4 → за один раз на гриле жарится до 4 стейков
+     *
+     * Каждая задача-партия занимает ровно 1 слот capacity оборудования
+     * и не зависит от того, сколько порций в ней — duration одинаков.
+     */
+    @Column(name = "portions_per_slot", nullable = false, columnDefinition = "integer default 1")
+    private int portionsPerSlot = 1;
 }

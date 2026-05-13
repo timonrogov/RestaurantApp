@@ -142,6 +142,24 @@ public class CookingTask {
     @Column(name = "delay_reason")
     private String delayReason;
 
+    /**
+     * Количество порций в этой партии.
+     *
+     * Устанавливается OrderAgent при создании задачи на основе:
+     *   quantity и template.portionsPerSlot
+     *
+     * Нужно повару на KDS: «пожарь 2 стейка» вместо просто «пожарь стейк».
+     * Для последней неполной партии может быть меньше portionsPerSlot.
+     *
+     * Примеры:
+     *   Заказано 5 стейков, portionsPerSlot=2:
+     *     Задача 1: portionCount=2
+     *     Задача 2: portionCount=2
+     *     Задача 3: portionCount=1
+     */
+    @Column(name = "portion_count", nullable = false, columnDefinition = "integer default 1")
+    private int portionCount = 1;
+
     // -----------------------------------------------------------------------
     // Вспомогательные методы для удобства
     // -----------------------------------------------------------------------

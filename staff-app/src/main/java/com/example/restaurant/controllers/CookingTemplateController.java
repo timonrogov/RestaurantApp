@@ -46,6 +46,7 @@ public class CookingTemplateController {
                                @RequestParam int durationMinutes,
                                @RequestParam CookSpecialization requiredSpecialization,
                                @RequestParam(required = false) String requiredEquipmentType,
+                               @RequestParam(defaultValue = "1") int portionsPerSlot,  // НОВЫЙ ПАРАМЕТР
                                RedirectAttributes redirectAttributes) {
         Dish dish = dishService.getDishById(dishId);
         if (dish == null) return "redirect:/admin/dishes";
@@ -61,6 +62,8 @@ public class CookingTemplateController {
                         ? requiredEquipmentType.trim().toUpperCase()
                         : null
         );
+        template.setPortionsPerSlot(Math.max(1, portionsPerSlot));  // НОВАЯ СТРОКА (защита от 0 и отрицательных)
+
         templateRepository.save(template);
 
         redirectAttributes.addFlashAttribute("success", "Этап «" + stepName + "» добавлен");

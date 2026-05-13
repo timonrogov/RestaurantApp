@@ -28,6 +28,7 @@ public class CookingTaskDto {
     public int    courseNumber;
     public boolean urgent;          // minutesLeft <= 5 и не DONE
     public boolean overdue;         // minutesLeft < 0 и не DONE
+    public int portionCount;     // сколько порций в этой партии (1 = одна порция)
 
     public static CookingTaskDto from(CookingTask task) {
         CookingTaskDto dto = new CookingTaskDto();
@@ -40,6 +41,7 @@ public class CookingTaskDto {
         dto.stepNumber    = task.getTemplate().getStepNumber();
         dto.clientComment = task.getOrderItem().getComment();
         dto.courseNumber  = task.getOrderItem().getCourseNumber();
+        dto.portionCount  = task.getPortionCount();
 
         if (task.getPlannedStartTime() != null)
             dto.plannedStartTime = task.getPlannedStartTime().format(TIME_FMT);

@@ -298,6 +298,58 @@ class SchedulerIntegrationTest {
         ));
     }
 
+    @Test
+    @DisplayName("Сценарий 5: quantity=5, portionsPerSlot=2 → 3 задачи, все запланированы")
+    void scenario5_portionsPerSlot_createsCorrectBatchCount() {
+        // Arrange: 2 повара (чтобы 3 задачи могли распределиться)
+        CookProfile cook1 = buildCookProfile(1L, CookSpecialization.UNIVERSAL);
+        CookProfile cook2 = buildCookProfile(2L, CookSpecialization.UNIVERSAL);
+        dispatcher.initialize(List.of(cook1, cook2), List.of());
+
+        // Шаблон: 2 порции за раз (portionsPerSlot=2), 15 мин
+        CookingTaskTemplate template = buildTemplate(
+                1L, 1, "Жарка стейков", 15,
+                CookSpecialization.UNIVERSAL, null,
+                2  // portionsPerSlot=2
+        );
+
+        Dish dish = buildDish(1L, "Стейк рибай");
+        // Заказано 5 стейков
+        OrderItem item = buildOrderItem(1L, dish, 1, 5);
+        Order order = buildOrder(1L, List.of(item));
+
+        when(templateRepository.findByDishIdOrderByStepNumberAsc(1L))
+                .thenReturn(List.of(template));
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+
+        // Act
+        messageBus.deliver(DispatcherAgent.AGENT_ID,
+                new Message(MessageType.NEW_ORDER, order, "TEST"));
+        messageBus.processAll();
+
+        // Assert 1: создано ровно 3 задачи (ceil(5/2) = 3)
+        List<CookingTask> allTasks = new ArrayList<>(fakeTaskDb.values());
+        assertThat(allTasks).hasSize(3);
+
+        // Assert 2: portionCount корректен: [2, 2, 1]
+        List<Integer> portionCounts = allTasks.stream()
+                .map(CookingTask::getPortionCount)
+                .sorted()
+                .toList();
+        assertThat(portionCounts).containsExactly(1, 2, 2);
+
+        // Assert 3: все задачи успешно запланированы
+        long plannedCount = allTasks.stream()
+                .filter(t -> t.getStatus() == CookingTaskStatus.PLANNED)
+                .count();
+        assertThat(plannedCount).isEqualTo(3);
+
+        // Assert 4: все задачи назначены на поваров
+        boolean allAssigned = allTasks.stream()
+                .allMatch(t -> t.getAssignedCook() != null);
+        assertThat(allAssigned).isTrue();
+    }
+
     // -----------------------------------------------------------------------
     // Вспомогательные фабричные методы
     // -----------------------------------------------------------------------
@@ -325,6 +377,12 @@ class SchedulerIntegrationTest {
     private CookingTaskTemplate buildTemplate(Long id, int step, String name,
                                               int duration, CookSpecialization spec,
                                               String equipType) {
+        return buildTemplate(id, step, name, duration, spec, equipType, 1);
+    }
+
+    private CookingTaskTemplate buildTemplate(Long id, int step, String name,
+                                              int duration, CookSpecialization spec,
+                                              String equipType, int portionsPerSlot) {
         CookingTaskTemplate t = new CookingTaskTemplate();
         try {
             var f = CookingTaskTemplate.class.getDeclaredField("id");
@@ -336,6 +394,7 @@ class SchedulerIntegrationTest {
         t.setDurationMinutes(duration);
         t.setRequiredSpecialization(spec);
         t.setRequiredEquipmentType(equipType);
+        t.setPortionsPerSlot(portionsPerSlot);
         return t;
     }
 
@@ -351,6 +410,10 @@ class SchedulerIntegrationTest {
     }
 
     private OrderItem buildOrderItem(Long id, Dish dish, int courseNumber) {
+        return buildOrderItem(id, dish, courseNumber, 1);  // дефолт: 1 порция
+    }
+
+    private OrderItem buildOrderItem(Long id, Dish dish, int courseNumber, int quantity) {
         OrderItem item = new OrderItem();
         try {
             var f = OrderItem.class.getDeclaredField("id");
@@ -359,7 +422,7 @@ class SchedulerIntegrationTest {
         } catch (Exception ignored) {}
         item.setDish(dish);
         item.setCourseNumber(courseNumber);
-        item.setQuantity(1);
+        item.setQuantity(quantity);
         return item;
     }
 

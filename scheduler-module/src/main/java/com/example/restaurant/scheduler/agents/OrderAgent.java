@@ -175,20 +175,17 @@ public class OrderAgent extends BaseAgent {
     /**
      * Создать CookingTask-объекты для всех позиций заказа.
      *
-     * Для каждой OrderItem берём все CookingTaskTemplate блюда,
-     * создаём по одному CookingTask на каждый шаблон и добавляем
-     * ID задачи в CourseState соответствующего курса.
+     * ИЗМЕНЕНИЕ: теперь учитывается OrderItem.quantity и template.portionsPerSlot.
+     * Для каждого шаблона создаётся ceil(quantity / portionsPerSlot) задач-партий.
      *
-     * Задачи многоэтапных блюд (stepNumber > 1) не запускаются сразу —
-     * TaskAgent для шага N создаётся только после завершения шага N-1.
-     * Поэтому в CourseState.taskIds мы пока добавляем только задачи
-     * первого шага (stepNumber == 1). Задачи следующих шагов будут
-     * добавлены динамически в handleStepCompleted() — но для упрощения
-     * в текущей реализации все этапы одного блюда считаются независимыми
-     * и планируются параллельно (stepNumber игнорируется).
+     * Каждая партия — отдельная CookingTask с полем portionCount:
+     *   полная партия:    portionCount = portionsPerSlot
+     *   последняя (неполная): portionCount = quantity mod portionsPerSlot
      *
-     * Примечание: последовательное планирование этапов (шаг N после шага N-1)
-     * — это расширение, которое можно добавить позднее.
+     * Планировщик не знает о partitionCount — он работает с задачами как обычно,
+     * каждая занимает 1 capacity у оборудования и 1 слот у повара.
+     *
+     * Граничный случай: quantity = 0 → задачи не создаются (корректно).
      */
     private void createCookingTasksForAllItems() {
         for (OrderItem item : order.getOrderItems()) {
@@ -196,13 +193,11 @@ public class OrderAgent extends BaseAgent {
             CourseState courseState = findCourseState(courseNumber);
 
             if (courseState == null) {
-                // Позиция ссылается на несуществующий курс — используем первый
                 log.warn("{}: OrderItem {} ссылается на курс {}, которого нет. Используем курс 1.",
                         agentId, item.getId(), courseNumber);
                 courseState = courseStates.get(0);
             }
 
-            // Загружаем шаблоны этапов блюда
             List<CookingTaskTemplate> templates = templateRepository
                     .findByDishIdOrderByStepNumberAsc(item.getDish().getId());
 
@@ -212,19 +207,37 @@ public class OrderAgent extends BaseAgent {
                 continue;
             }
 
-            // Создаём CookingTask для каждого шаблона
+            int quantity = item.getQuantity();
+
             for (CookingTaskTemplate template : templates) {
-                CookingTask task = new CookingTask();
-                task.setOrderItem(item);
-                task.setTemplate(template);
-                task.setStatus(PENDING);
+                int pps = template.getPortionsPerSlot();  // portions per slot
 
-                CookingTask saved = taskRepository.save(task);
-                courseState.addTaskId(saved.getId());
+                // ceil(quantity / pps): количество партий для этого шаблона
+                int batchCount = (pps <= 0 || quantity <= 0)
+                        ? 0
+                        : (int) Math.ceil((double) quantity / pps);
 
-                log.debug("{}: создана задача #{} для блюда '{}', шаг {} ({})",
-                        agentId, saved.getId(), item.getDish().getName(),
-                        template.getStepNumber(), template.getStepName());
+                for (int b = 0; b < batchCount; b++) {
+                    // Последняя партия может быть неполной
+                    int portionCount = (b == batchCount - 1)
+                            ? quantity - b * pps   // остаток
+                            : pps;                 // полная партия
+
+                    CookingTask task = new CookingTask();
+                    task.setOrderItem(item);
+                    task.setTemplate(template);
+                    task.setStatus(PENDING);
+                    task.setPortionCount(portionCount);
+
+                    CookingTask saved = taskRepository.save(task);
+                    courseState.addTaskId(saved.getId());
+
+                    log.debug("{}: создана задача #{} для блюда '{}', шаг {} ({}), " +
+                                    "партия {}/{}, порций: {}",
+                            agentId, saved.getId(), item.getDish().getName(),
+                            template.getStepNumber(), template.getStepName(),
+                            b + 1, batchCount, portionCount);
+                }
             }
         }
     }
@@ -442,6 +455,8 @@ public class OrderAgent extends BaseAgent {
         // буфер +1 мин добавляться не будет.
         current.firstPlanningDone = true;
 
+        current.stableTargetEndTime = times.targetEndTime;
+
         log.debug("{}: параметры курса {}: notBefore={}, targetEnd={}, deadline={}",
                 agentId, current.courseNumber,
                 times.notBefore, times.targetEndTime, times.deadline);
@@ -496,6 +511,22 @@ public class OrderAgent extends BaseAgent {
 
         courseState.markPlanned(taskId, confirmedEnd);
 
+        // Выравнивание срабатывает ТОЛЬКО если задача вернулась позже
+        // текущей стабильной цели (реальный сдвиг, не ASAP-переполнение).
+        // ASAP-задачи (confirmedEnd <= stableTarget) цель не двигают.
+        boolean genuinelyLater = confirmedEnd != null
+                && courseState.stableTargetEndTime != null
+                && confirmedEnd.isAfter(courseState.stableTargetEndTime.plusMinutes(1));
+
+        if (!genuinelyLater) {
+            // Цель не изменилась — просто проверяем завершение курса
+            checkCourseCompletion(courseState);
+            return;
+        }
+
+        // Реальный сдвиг: обновляем стабильную цель и выравниваем других
+        courseState.stableTargetEndTime = confirmedEnd;
+
         // JIT-выравнивание: если только что запланированная задача задала новый
         // (более поздний) targetEndTime, нужно перепланировать те задачи курса,
         // которые заканчиваются значительно раньше — они «висят» с лишним разрывом.
@@ -527,14 +558,14 @@ public class OrderAgent extends BaseAgent {
 
         // Проверяем ВСЕ запланированные задачи курса, включая только что добавленную
         for (Long plannedId : courseState.plannedTaskIds) {
+            if (plannedId == taskId) continue;
             CookingTask pt = taskRepository.findById(plannedId).orElse(null);
             if (pt == null) continue;
-            if (pt.getStatus() == IN_PROGRESS
-                    || pt.getStatus() == CookingTaskStatus.DONE) continue;
+            if (pt.getStatus() == IN_PROGRESS || pt.getStatus() == DONE) continue;
 
             if (pt.getPlannedEndTime() != null) {
                 long diffMinutes = ChronoUnit.MINUTES.between(
-                        pt.getPlannedEndTime(), times.targetEndTime);
+                        pt.getPlannedEndTime(), courseState.stableTargetEndTime);
                 if (diffMinutes >= 1) {
                     tasksToReplan.add(plannedId);
                 }
@@ -933,6 +964,10 @@ public class OrderAgent extends BaseAgent {
          * курса он остаётся true.
          */
         boolean firstPlanningDone = false;
+
+        /** Стабильный целевой дедлайн курса. Обновляется только если задача
+         *  подтвердила время позже текущей цели. ASAP-задачи его не двигают. */
+        LocalDateTime stableTargetEndTime = null;
 
         CourseState(int courseNumber, int syncGapMinutes) {
             this.courseNumber = courseNumber;

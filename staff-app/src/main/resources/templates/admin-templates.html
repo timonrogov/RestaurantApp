@@ -64,6 +64,10 @@
                         <div class="sched-template-name" th:text="${tmpl.stepName}">Нарезка</div>
                         <div class="sched-template-meta">
                             <span><i class="fas fa-clock"></i> <strong th:text="${tmpl.durationMinutes}">10</strong> мин</span>
+                            <span>
+                                <i class="fas fa-layer-group"></i>
+                                <strong th:text="${tmpl.portionsPerSlot}">1</strong> пор./раз
+                            </span>
                             <span class="sched-spec-badge" th:text="${tmpl.requiredSpecialization.displayName}">Цех</span>
                             <span th:if="${tmpl.requiredEquipmentType != null}"
                                   class="sched-equip-badge"
@@ -118,6 +122,15 @@
                     <label>Тип оборудования <span class="sched-optional">(оставьте пустым если не нужно)</span></label>
                     <input type="text" name="requiredEquipmentType"
                            placeholder="OVEN, GRILL, FRYER, STOVE...">
+                </div>
+
+                <div class="sched-form-group">
+                    <label>
+                        Порций за раз
+                        <span class="sched-optional">(сколько порций готовится одновременно на одной единице оборудования)</span>
+                    </label>
+                    <input type="number" name="portionsPerSlot" min="1" value="1" required
+                           title="Например: 4 — значит 4 стейка одновременно на гриле = 1 задача для планировщика">
                 </div>
 
                 <button type="submit" class="btn btn-primary" style="width:100%">

@@ -306,6 +306,10 @@
         const comment = task.clientComment
             ? `<div class="kds-comment-block"><i class="fas fa-comment-alt"></i><span class="kds-comment-text">${esc(task.clientComment)}</span></div>` : '';
 
+        // Отображаем количество порций только если их больше одной
+        const portionsHtml = task.portionCount > 1
+            ? `<div class="kds-portions"><i class="fas fa-layer-group"></i> <strong>${task.portionCount} порции</strong></div>`
+            : '';
         let timeRow = '';
         if (task.plannedStartTime && task.plannedEndTime && task.status !== 'DONE') {
             const ml = task.minutesLeft;
@@ -345,7 +349,7 @@
             <div class="kds-card-body">
                 <div class="kds-dish-name">${esc(task.dishName)}</div>
                 <div class="kds-step-name"><i class="fas fa-utensils"></i> ${esc(task.stepName)}</div>
-                ${comment}${timeRow}
+                    ${portionsHtml}${comment}${timeRow}
             </div>${actions}`;
         return div;
     }

@@ -731,6 +731,29 @@
     50%       { opacity: 0.3; }
 }
 
+.kds-portions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+    margin-bottom: 4px;
+    padding: 3px 8px;
+    background: var(--color2);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    color: var(--color5);
+}
+
+.kds-portions i {
+    color: var(--color4);
+    font-size: 0.8rem;
+}
+
+.kds-portions strong {
+    font-weight: 700;
+    color: var(--color5);
+}
+
 /* ============================================================
    8. Адаптивность
    ============================================================ */

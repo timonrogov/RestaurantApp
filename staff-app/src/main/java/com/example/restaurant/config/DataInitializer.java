@@ -456,9 +456,9 @@ public class DataInitializer implements CommandLineRunner {
                     .filter(d -> d.getName().equals("Стейк Рибай Black Angus"))
                     .findFirst()
                     .ifPresent(steak -> {
-                        templateRepository.save(new CookingTaskTemplate(null, steak, 1, "Подготовка мяса", 3, CookSpecialization.HOT_SHOP, null, false));
-                        templateRepository.save(new CookingTaskTemplate(null, steak, 2, "Жарка на гриле", 12, CookSpecialization.GRILL, "GRILL", false));
-                        templateRepository.save(new CookingTaskTemplate(null, steak, 3, "Отдых мяса и подача", 5, CookSpecialization.HOT_SHOP, null, false));
+                        templateRepository.save(new CookingTaskTemplate(null, steak, 1, "Подготовка мяса", 3, CookSpecialization.HOT_SHOP, null, false, 1));
+                        templateRepository.save(new CookingTaskTemplate(null, steak, 2, "Жарка на гриле", 12, CookSpecialization.GRILL, "GRILL", false, 1));
+                        templateRepository.save(new CookingTaskTemplate(null, steak, 3, "Отдых мяса и подача", 5, CookSpecialization.HOT_SHOP, null, false, 1));
                     });
 
             // 2. Шаблон для Цезаря (быстро, без оборудования)
@@ -466,7 +466,7 @@ public class DataInitializer implements CommandLineRunner {
                     .filter(d -> d.getName().equals("Цезарь с тигровыми креветками"))
                     .findFirst()
                     .ifPresent(caesar -> {
-                        templateRepository.save(new CookingTaskTemplate(null, caesar, 1, "Нарезка и сборка", 8, CookSpecialization.COLD_SHOP, null, false));
+                        templateRepository.save(new CookingTaskTemplate(null, caesar, 1, "Нарезка и сборка", 8, CookSpecialization.COLD_SHOP, null, false, 1));
                     });
 
             // 3. Шаблон для Картофеля по-деревенски
@@ -474,13 +474,13 @@ public class DataInitializer implements CommandLineRunner {
                     .filter(d -> d.getName().equals("Картофель по-деревенски"))
                     .findFirst()
                     .ifPresent(potato -> {
-                        templateRepository.save(new CookingTaskTemplate(null, potato, 1, "Запекание", 15, CookSpecialization.HOT_SHOP, "OVEN", false));
+                        templateRepository.save(new CookingTaskTemplate(null, potato, 1, "Запекание", 15, CookSpecialization.HOT_SHOP, "OVEN", false, 1));
                     });
 
             // Для простоты, всем остальным блюдам дадим базовый шаблон на 10 минут:
             dishRepository.findAll().forEach(dish -> {
                 if (!templateRepository.existsByDishId(dish.getId())) {
-                    templateRepository.save(new CookingTaskTemplate(null, dish, 1, "Приготовление: " + dish.getName(), 10, CookSpecialization.UNIVERSAL, null, false));
+                    templateRepository.save(new CookingTaskTemplate(null, dish, 1, "Приготовление: " + dish.getName(), 10, CookSpecialization.UNIVERSAL, null, false, 1));
                 }
             });
 

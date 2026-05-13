@@ -12,8 +12,8 @@ import com.example.restaurant.repositories.CookingTaskRepository;
 import com.example.restaurant.repositories.EquipmentRepository;
 import com.example.restaurant.repositories.OrderRepository;
 import com.example.restaurant.scheduler.config.SchedulerProperties;
-import com.example.restaurant.scheduler.dispatcher.DispatcherAgent;
-import com.example.restaurant.scheduler.dispatcher.MessageBus;
+import com.example.restaurant.scheduler.agents.DispatcherAgent;
+import com.example.restaurant.scheduler.messages.MessageBus;
 import com.example.restaurant.scheduler.messages.Message;
 import com.example.restaurant.scheduler.messages.MessageType;
 import com.example.restaurant.scheduler.messages.dto.TaskDelayBody;
@@ -376,13 +376,32 @@ public class SchedulerService {
         // Шаг 2: освободить ресурсы
         dispatchAndProcess(MessageType.TASK_DONE_EVENT, taskId);
 
-        // Шаг 3: если закончил значительно раньше — сдвинуть следующие задачи
+        // До реализации полного перепланирования.
+        /*// Шаг 3: если закончил значительно раньше — сдвинуть следующие задачи
         if (task.getPlannedEndTime() != null) {
             long earlyMinutes = ChronoUnit.MINUTES.between(actualEnd, task.getPlannedEndTime());
             if (earlyMinutes > schedulerProperties.getAdaptive().getEarlyFinishThresholdMinutes()) {
                 log.info("SchedulerService: задача #{} завершена на {} мин раньше — " +
                         "сдвигаем последующие задачи", taskId, earlyMinutes);
                 // Отрицательное значение = сдвиг назад
+                TaskDelayBody earlyBody = new TaskDelayBody(taskId, (int) -earlyMinutes, null);
+                dispatchAndProcess(MessageType.TASK_DELAY_EVENT, earlyBody);
+            }
+        }*/
+
+        // Шаг 3: если закончил раньше на достаточное время — полное перепланирование.
+        //
+        // Используем minRescheduleGainMinutes (не earlyFinishThresholdMinutes):
+        //   – новый параметр имеет более чёткую семантику
+        //   – ChronoUnit.MINUTES усекает секунды, поэтому порог 1 мин корректен
+        //     (59 сек → 0 мин → не перепланируем, 61 сек → 1 мин → перепланируем)
+        if (task.getPlannedEndTime() != null) {
+            long earlyMinutes = ChronoUnit.MINUTES.between(actualEnd, task.getPlannedEndTime());
+            int minGain = schedulerProperties.getAdaptive().getMinRescheduleGainMinutes();
+            if (earlyMinutes >= minGain) {
+                log.info("SchedulerService: задача #{} завершена на {} мин раньше — " +
+                        "перепланируем оставшиеся задачи заказа", taskId, earlyMinutes);
+                // Отрицательное значение = досрочное завершение (сдвиг назад)
                 TaskDelayBody earlyBody = new TaskDelayBody(taskId, (int) -earlyMinutes, null);
                 dispatchAndProcess(MessageType.TASK_DELAY_EVENT, earlyBody);
             }

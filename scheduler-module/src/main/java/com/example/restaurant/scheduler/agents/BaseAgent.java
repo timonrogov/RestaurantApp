@@ -1,6 +1,6 @@
 package com.example.restaurant.scheduler.agents;
 
-import com.example.restaurant.scheduler.dispatcher.MessageBus;
+import com.example.restaurant.scheduler.messages.MessageBus;
 import com.example.restaurant.scheduler.messages.Message;
 import com.example.restaurant.scheduler.messages.MessageType;
 import org.slf4j.Logger;

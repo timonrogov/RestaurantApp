@@ -135,16 +135,20 @@ public class SchedulerProperties {
         private long pendingOrdersPollMs = 10_000L;
         /** Сдвиг при автообнаружении задержки (мин). */
         private int autoDelayAheadMinutes = 1;
+        /** Минимальный выигрыш (мин) досрочного завершения для запуска перепланирования. */
+        private int minRescheduleGainMinutes = 1;
 
         public int getEarlyFinishThresholdMinutes() { return earlyFinishThresholdMinutes; }
         public String getDelayDetectCron() { return delayDetectCron; }
         public long getPendingOrdersPollMs() { return pendingOrdersPollMs; }
         public int getAutoDelayAheadMinutes() { return autoDelayAheadMinutes; }
+        public int getMinRescheduleGainMinutes() { return minRescheduleGainMinutes; }
 
         public void setEarlyFinishThresholdMinutes(int v) { this.earlyFinishThresholdMinutes = v; }
         public void setDelayDetectCron(String v) { this.delayDetectCron = v; }
         public void setPendingOrdersPollMs(long v) { this.pendingOrdersPollMs = v; }
         public void setAutoDelayAheadMinutes(int v) { this.autoDelayAheadMinutes = v; }
+        public void setMinRescheduleGainMinutes(int v) { this.minRescheduleGainMinutes = v; }
     }
 
     // -----------------------------------------------------------------------

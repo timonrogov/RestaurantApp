@@ -407,13 +407,7 @@ public class TaskAgent extends BaseAgent {
                 chosenCookVariant.getResourceAgentId(),
                 chosenCookVariant.getStartTime(), chosenCookVariant.getEndTime());
 
-        if (equipmentNeeded) {
-            // Сначала проверяем оборудование — оно дополнительное ограничение
-            sendEquipmentRequest(chosenCookVariant);
-        } else {
-            // Оборудование не нужно — сразу бронируем повара
-            sendCookPlanningRequest(chosenCookVariant);
-        }
+        sendCookPlanningRequest(chosenCookVariant);
     }
 
     /**

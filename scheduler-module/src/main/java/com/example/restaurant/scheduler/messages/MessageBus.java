@@ -1,8 +1,7 @@
-package com.example.restaurant.scheduler.dispatcher;
+package com.example.restaurant.scheduler.messages;
 
 import com.example.restaurant.scheduler.agents.BaseAgent;
 import com.example.restaurant.scheduler.config.SchedulerProperties;
-import com.example.restaurant.scheduler.messages.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;

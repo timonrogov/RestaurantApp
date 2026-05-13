@@ -16,10 +16,14 @@ import com.example.restaurant.scheduler.messages.dto.InitTaskPayload;
 import com.example.restaurant.scheduler.messages.dto.TaskPlannedBody;
 import com.example.restaurant.scheduler.messages.dto.TaskDelayBody;
 import com.example.restaurant.scheduler.messages.dto.CancelAndReplanBody;
+import com.example.restaurant.scheduler.schedule.CookSchedule;
+import com.example.restaurant.scheduler.schedule.EquipmentTypeSchedule;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+
+import static com.example.restaurant.enums.CookingTaskStatus.*;
 
 /**
  * Агент заказа — координатор планирования всего заказа.
@@ -213,7 +217,7 @@ public class OrderAgent extends BaseAgent {
                 CookingTask task = new CookingTask();
                 task.setOrderItem(item);
                 task.setTemplate(template);
-                task.setStatus(CookingTaskStatus.PENDING);
+                task.setStatus(PENDING);
 
                 CookingTask saved = taskRepository.save(task);
                 courseState.addTaskId(saved.getId());
@@ -399,8 +403,8 @@ public class OrderAgent extends BaseAgent {
         // каждый агент грамотно выбирает лучшего из оставшихся поваров,
         // а порядок переговоров гарантирует, что «длинные» задачи имеют приоритет.
         List<CookingTask> tasksToPlan = tasks.stream()
-                .filter(t -> t.getStatus() == CookingTaskStatus.PENDING
-                        || t.getStatus() == CookingTaskStatus.FAILED)
+                .filter(t -> t.getStatus() == PENDING
+                        || t.getStatus() == FAILED)
                 .sorted(Comparator.comparingInt(
                         (CookingTask t) -> t.getTemplate().getDurationMinutes()
                 ).reversed())   // LPT: длинные задачи ведут переговоры первыми
@@ -410,8 +414,8 @@ public class OrderAgent extends BaseAgent {
         // некоторые могут быть уже IN_PROGRESS или DONE — их не трогаем).
         current.plannedTaskIds.clear();
         for (CookingTask t : tasks) {
-            if (t.getStatus() != CookingTaskStatus.PENDING
-                    && t.getStatus() != CookingTaskStatus.FAILED
+            if (t.getStatus() != PENDING
+                    && t.getStatus() != FAILED
                     && t.getStatus() != CookingTaskStatus.CANCELLED) {
                 current.plannedTaskIds.add(t.getId());
             }
@@ -525,7 +529,7 @@ public class OrderAgent extends BaseAgent {
         for (Long plannedId : courseState.plannedTaskIds) {
             CookingTask pt = taskRepository.findById(plannedId).orElse(null);
             if (pt == null) continue;
-            if (pt.getStatus() == CookingTaskStatus.IN_PROGRESS
+            if (pt.getStatus() == IN_PROGRESS
                     || pt.getStatus() == CookingTaskStatus.DONE) continue;
 
             if (pt.getPlannedEndTime() != null) {
@@ -575,7 +579,7 @@ public class OrderAgent extends BaseAgent {
 
                 // Сбрасываем задачу в БД.
                 CookingTask pt = taskRepository.findById(idToReplan).orElseThrow();
-                pt.setStatus(CookingTaskStatus.PENDING);
+                pt.setStatus(PENDING);
                 pt.setPlannedStartTime(null);
                 pt.setPlannedEndTime(null);
                 pt.setAssignedCook(null);
@@ -677,6 +681,28 @@ public class OrderAgent extends BaseAgent {
     }
 
     /**
+     * Найти индекс первого курса, в котором есть хотя бы одна задача,
+     * требующая планирования (PENDING, PLANNED или FAILED).
+     *
+     * IN_PROGRESS и DONE задачи не считаются: они уже выполняются или выполнены,
+     * их слоты зафиксированы.
+     *
+     * @return индекс первого такого курса, или courseStates.size() если все завершены
+     */
+    private int findFirstIndexWithPendingTasks() {
+        for (int i = 0; i < courseStates.size(); i++) {
+            CourseState cs = courseStates.get(i);
+            List<CookingTask> tasks = taskRepository.findAllById(cs.taskIds);
+            boolean hasPending = tasks.stream().anyMatch(t ->
+                    t.getStatus() == PENDING
+                            || t.getStatus() == CookingTaskStatus.PLANNED
+                            || t.getStatus() == FAILED);
+            if (hasPending) return i;
+        }
+        return courseStates.size(); // все курсы завершены
+    }
+
+    /**
      * Найти CourseState по ID задачи.
      * Перебирает все курсы и ищет тот, в чьём taskIds есть нужный ID.
      */
@@ -698,8 +724,8 @@ public class OrderAgent extends BaseAgent {
             // Игнорируем только PENDING (они сейчас перепланируются и не имеют времени),
             // а также отмененные и проваленные.
             // PLANNED, IN_PROGRESS и DONE обязательно учитываем!
-            if (t.getStatus() == CookingTaskStatus.PENDING ||
-                    t.getStatus() == CookingTaskStatus.FAILED ||
+            if (t.getStatus() == PENDING ||
+                    t.getStatus() == FAILED ||
                     t.getStatus() == CookingTaskStatus.CANCELLED) {
                 continue;
             }
@@ -720,47 +746,123 @@ public class OrderAgent extends BaseAgent {
 
     /**
      * Реакция на задержку или досрочное завершение задачи.
-     * OrderAgent пересчитывает время для этого курса и заставляет все
-     * зависимые задачи (в этом и следующих курсах) провести новые торги.
+     *
+     * Запускает полное перепланирование всех незавершённых задач заказа,
+     * начиная с наиболее раннего курса, который затронут событием или
+     * содержит незавершённые задачи.
+     *
+     * Логика выбора стартового курса:
+     *   affectedIndex   — курс задачи, которая вызвала событие
+     *   firstPendingIndex — первый курс с незавершёнными задачами
+     *   startIndex = min(affectedIndex, firstPendingIndex)
+     *
+     * Пример: второй курс (основные блюда) уже PLANNED, событие от задачи
+     * первого курса (salads, affectedIndex=0). firstPendingIndex=0 или 1.
+     * min(0, 0) = 0 → сбрасываем оба курса. Если бы брали только affectedIndex,
+     * второй курс остался бы нетронутым с устаревшим расписанием.
      */
     private void handleTaskDelayEvent(Message message) {
         TaskDelayBody body = (TaskDelayBody) message.getBody();
         long taskId = body.getTaskId();
 
         CourseState affectedCourse = findCourseStateByTaskId(taskId);
-        if (affectedCourse == null) return;
+        if (affectedCourse == null) {
+            log.warn("{}: TASK_DELAY_EVENT для задачи #{} — курс не найден", agentId, taskId);
+            return;
+        }
 
-        int startIndex = courseStates.indexOf(affectedCourse);
-        log.info("{}: сдвиг в курсе {}. Сбрасываем старые планы.", agentId, affectedCourse.courseNumber);
+        int affectedIndex = courseStates.indexOf(affectedCourse);
+        int firstPendingIndex = findFirstIndexWithPendingTasks();
 
+        if (firstPendingIndex >= courseStates.size()) {
+            log.debug("{}: TASK_DELAY_EVENT — все задачи завершены, перепланирование не нужно",
+                    agentId);
+            return;
+        }
+
+        int startIndex = Math.min(affectedIndex, firstPendingIndex);
+
+        log.info("{}: сдвиг в курсе {} (задача #{}). Полный сброс с курса {}.",
+                agentId, affectedCourse.courseNumber, taskId,
+                courseStates.get(startIndex).courseNumber);
+
+        triggerFullReschedule(startIndex);
+    }
+
+    /**
+     * Сбросить все незавершённые задачи начиная с курса {@code startIndex}
+     * и запустить полное перепланирование.
+     *
+     * Алгоритм:
+     *   1. Для каждого курса от startIndex до конца:
+     *      — IN_PROGRESS и DONE задачи: фиксируем в plannedTaskIds, не трогаем.
+     *      — PLANNED, PENDING, FAILED задачи: отправляем CANCEL_AND_REPLAN,
+     *        сбрасываем в PENDING, очищаем время и назначение.
+     *   2. Запускаем planCurrentCourse() — дальше система работает в штатном режиме:
+     *      задачи планируются, TASK_PLANNED каскадирует к следующему курсу.
+     *
+     * Почему сбрасываем failedTaskIds:
+     *   Провалившаяся задача мешала завершению курса (учитывалась в resolved).
+     *   После сброса она получает новый шанс на планирование — ситуация могла
+     *   измениться (повар освободился, оборудование починили).
+     *
+     * @param startIndex индекс курса, с которого начинаем сброс
+     */
+    private void triggerFullReschedule(int startIndex) {
+        if (startIndex >= courseStates.size()) {
+            log.debug("{}: triggerFullReschedule: все курсы завершены, ничего не делаем", agentId);
+            return;
+        }
+
+        // Откатываем currentCourseIndex если нужно
         if (startIndex < currentCourseIndex) {
             currentCourseIndex = startIndex;
         }
 
-        // ИСПРАВЛЕНО БАГ-05: проверяем статус из БД перед сбросом
+        log.info("{}: полный сброс и перепланирование с курса {} (currentCourseIndex={})",
+                agentId, courseStates.get(startIndex).courseNumber, currentCourseIndex);
+
         for (int i = startIndex; i < courseStates.size(); i++) {
             CourseState cs = courseStates.get(i);
             List<CookingTask> tasks = taskRepository.findAllById(cs.taskIds);
 
+            cs.plannedTaskIds.clear();
+            cs.failedTaskIds.clear();
+
             for (CookingTask t : tasks) {
-                // КРИТИЧНО: не трогаем IN_PROGRESS и DONE задачи
-                if (t.getStatus() == CookingTaskStatus.IN_PROGRESS
-                        || t.getStatus() == CookingTaskStatus.DONE) {
-                    log.debug("{}: пропускаем задачу #{} в статусе {} при TASK_DELAY_EVENT",
-                            agentId, t.getId(), t.getStatus());
+                if (t.getStatus() == IN_PROGRESS || t.getStatus() == DONE) {
+                    cs.plannedTaskIds.add(t.getId());
                     continue;
                 }
+                if (t.getStatus() == PLANNED || t.getStatus() == PENDING || t.getStatus() == FAILED) {
 
-                if (t.getStatus() == CookingTaskStatus.PLANNED
-                        || t.getStatus() == CookingTaskStatus.PENDING) {
+                    // ← Синхронно снимаем слот ДО того, как CANCEL_AND_REPLAN уйдёт в очередь.
+                    // Это исключает гонку: старый слот гарантированно снят,
+                    // когда новый PLANNING_REQUEST дойдёт до повара.
+                    if (t.getAssignedCook() != null) {
+                        CookSchedule cookSchedule = sceneAgent.getCookSchedule(
+                                t.getAssignedCook().getId());
+                        if (cookSchedule != null) {
+                            cookSchedule.removeSlotByTaskId(t.getId());
+                            log.debug("{}: слот задачи #{} синхронно снят с COOK_{}",
+                                    agentId, t.getId(), t.getAssignedCook().getId());
+                        }
+                    }
+                    // Аналогично для оборудования:
+                    if (t.getAssignedEquipmentType() != null) {
+                        EquipmentTypeSchedule equipSchedule = sceneAgent.getEquipmentTypeSchedule(
+                                t.getAssignedEquipmentType());
+                        if (equipSchedule != null) {
+                            equipSchedule.removeSlotByTaskId(t.getId());
+                        }
+                    }
 
                     String taId = taskIdToAgentId.get(t.getId());
                     if (taId != null) {
-                        // CANCEL_AND_REPLAN с body=null — TaskAgent сам снимет брони и будет ждать INIT
                         send(taId, MessageType.CANCEL_AND_REPLAN, null);
                     }
 
-                    t.setStatus(CookingTaskStatus.PENDING);
+                    t.setStatus(PENDING);
                     t.setPlannedStartTime(null);
                     t.setPlannedEndTime(null);
                     t.setAssignedCook(null);
@@ -770,6 +872,10 @@ public class OrderAgent extends BaseAgent {
             }
         }
 
+        // Запускаем планирование с currentCourseIndex.
+        // Если в этом курсе остались только IN_PROGRESS/DONE задачи (tasksToPlan пуст),
+        // planCurrentCourse() немедленно каскадирует к следующему курсу через
+        // checkCourseCompletion() → onCourseCompleted().
         planCurrentCourse();
     }
 

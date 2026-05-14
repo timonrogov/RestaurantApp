@@ -456,6 +456,7 @@ public class OrderAgent extends BaseAgent {
         current.firstPlanningDone = true;
 
         current.stableTargetEndTime = times.targetEndTime;
+        current.jitAlignmentFired = false;  // ← сбросить при каждом полном перезапуске
 
         log.debug("{}: параметры курса {}: notBefore={}, targetEnd={}, deadline={}",
                 agentId, current.courseNumber,
@@ -501,6 +502,32 @@ public class OrderAgent extends BaseAgent {
     // Фаза 3: отслеживание результатов
     // -----------------------------------------------------------------------
 
+    /**
+     * Обработать успешное завершение планирования одной задачи курса.
+     *
+     * Метод решает две задачи:
+     *   1. Отслеживает прогресс курса (когда все задачи спланированы —
+     *      запускает следующий курс или сигнализирует о завершении).
+     *   2. Запускает JIT-выравнивание (just-in-time alignment): если одна
+     *      задача получила время позже ожидаемого целевого окончания,
+     *      ранее спланированные задачи курса сдвигаются к этому новому
+     *      времени, чтобы все блюда были готовы одновременно.
+     *
+     * Почему JIT нужен:
+     *   Курс из 8 задач планируется параллельно. Три повара закрывают
+     *   первые три задачи в целевое окно. Четвёртая задача вынуждена
+     *   уйти в переполнение — она закончится на 15 мин позже. Без JIT
+     *   первые три задачи зависают в расписании с лишним разрывом, и
+     *   блюда оказываются готовы в разное время.
+     *
+     * Почему слоты снимаются синхронно (ключевое исправление бага 2):
+     *   В однопоточном FIFO MessageBus между CANCEL_AND_REPLAN и FREE_SLOT
+     *   проходит несколько шагов очереди. За это время другие задачи курса
+     *   (например, TASK_547/548) успевают забронировать JIT-слот у «занятого»
+     *   ещё повара, дробя свободное окно на куски меньше нужной длительности.
+     *   Синхронное снятие слота через sceneAgent гарантирует, что к моменту
+     *   старта новых переговоров расписание уже чистое — гонки нет.
+     */
     private void handleTaskPlanned(Message message) {
         TaskPlannedBody body = (TaskPlannedBody) message.getBody();
         long taskId = body.getTaskId();
@@ -509,69 +536,101 @@ public class OrderAgent extends BaseAgent {
         CourseState courseState = findCourseStateByTaskId(taskId);
         if (courseState == null) return;
 
+        // Фиксируем задачу как запланированную и обновляем latestPlannedEnd.
         courseState.markPlanned(taskId, confirmedEnd);
 
-        // Выравнивание срабатывает ТОЛЬКО если задача вернулась позже
-        // текущей стабильной цели (реальный сдвиг, не ASAP-переполнение).
-        // ASAP-задачи (confirmedEnd <= stableTarget) цель не двигают.
+        // -----------------------------------------------------------------------
+        // Решение: нужно ли JIT-выравнивание?
+        //
+        // JIT срабатывает только при «реальном» сдвиге — когда задача-переполнение
+        // (overflow) возвращает время, которое существенно позже текущей
+        // stableTargetEndTime. ASAP-задачи (быстрее цели) выравнивание не запускают.
+        //
+        // Порог в 1 минуту отсекает флуктуации округления: ChronoUnit.MINUTES
+        // усекает секунды, поэтому разница в 59 сек даёт 0 мин → не выравниваем.
+        // -----------------------------------------------------------------------
         boolean genuinelyLater = confirmedEnd != null
                 && courseState.stableTargetEndTime != null
                 && confirmedEnd.isAfter(courseState.stableTargetEndTime.plusMinutes(1));
 
-        if (!genuinelyLater) {
-            // Цель не изменилась — просто проверяем завершение курса
+        if (!genuinelyLater || courseState.jitAlignmentFired) {
+            // Два случая когда НЕ выравниваем:
+            //   а) confirmedEnd ≤ stableTarget + 1 мин — задача в пределах цели.
+            //   б) jitAlignmentFired = true — выравнивание уже сработало в этом
+            //      цикле планирования; повторное создало бы каскад (переполненные
+            //      задачи тоже спровоцировали бы выравнивание, и так до бесконечности).
             checkCourseCompletion(courseState);
             return;
         }
 
-        // Реальный сдвиг: обновляем стабильную цель и выравниваем других
-        courseState.stableTargetEndTime = confirmedEnd;
+        // -----------------------------------------------------------------------
+        // JIT-выравнивание: обновляем цель и находим задачи для перепланирования.
+        // -----------------------------------------------------------------------
 
-        // JIT-выравнивание: если только что запланированная задача задала новый
-        // (более поздний) targetEndTime, нужно перепланировать те задачи курса,
-        // которые заканчиваются значительно раньше — они «висят» с лишним разрывом.
+        // Фиксируем новую стабильную цель и блокируем повторные срабатывания.
+        courseState.stableTargetEndTime = confirmedEnd;
+        courseState.jitAlignmentFired = true;
+
+        // Пересчитываем временны́е параметры курса с учётом нового latestPlannedEnd.
+        // После markPlanned() latestPlannedEnd обновился — calculateCourseTimes()
+        // вернёт notBefore и targetEnd, отражающие актуальное состояние.
         CourseTimeParams times = calculateCourseTimes(courseStates.indexOf(courseState));
 
+        // Собираем ID задач, которые нужно сдвинуть к новой цели.
+        // Критерий: задача запланирована, ещё не выполняется, и её plannedEnd
+        // отстаёт от новой stableTargetEndTime минимум на 1 минуту.
         List<Long> tasksToReplan = new ArrayList<>();
-        /*for (Long plannedId : courseState.plannedTaskIds) {
-            if (plannedId == taskId) continue;
 
-            CookingTask pt = taskRepository.findById(plannedId).orElse(null);
-            if (pt == null) continue;
-
-            // Не трогаем задачи, которые уже выполняются или выполнены.
-            if (pt.getStatus() == CookingTaskStatus.IN_PROGRESS
-                    || pt.getStatus() == CookingTaskStatus.DONE) {
-                log.debug("{}: JIT-выравнивание: пропускаем задачу #{} в статусе {}",
-                        agentId, plannedId, pt.getStatus());
-                continue;
-            }
-
-            // Перепланируем только если задача заканчивается заметно раньше цели
-            // (30-секундный буфер исключает бесконечные микроперепланирования).
-            if (pt.getPlannedEndTime() != null
-                    && pt.getPlannedEndTime().isBefore(times.targetEndTime.minusSeconds(
-                    props.getPlanning().getJitAlignmentBufferSeconds()))) {
-                tasksToReplan.add(plannedId);
-            }
-        }*/
-
-        // Проверяем ВСЕ запланированные задачи курса, включая только что добавленную
         for (Long plannedId : courseState.plannedTaskIds) {
-            if (plannedId == taskId) continue;
+            if (plannedId == taskId) continue;  // только что запланированную не трогаем
+
             CookingTask pt = taskRepository.findById(plannedId).orElse(null);
             if (pt == null) continue;
+
+            // IN_PROGRESS и DONE не трогаем: повар уже работает, менять время нельзя.
             if (pt.getStatus() == IN_PROGRESS || pt.getStatus() == DONE) continue;
 
             if (pt.getPlannedEndTime() != null) {
                 long diffMinutes = ChronoUnit.MINUTES.between(
                         pt.getPlannedEndTime(), courseState.stableTargetEndTime);
                 if (diffMinutes >= 1) {
+
+                    // ★ НОВАЯ ПРОВЕРКА: есть ли вообще смысл перепланировать?
+                    //
+                    // Вычисляем, куда JIT-выравнивание попытается поставить задачу:
+                    //   jitStart = newTarget - duration
+                    //
+                    // Если jitStart <= plannedEnd, то новый JIT-слот начинается
+                    // там же, где заканчивается текущий слот задачи — или раньше.
+                    // Это означает структурное переполнение: JIT-слот уже занят
+                    // задачей-триггером (или другим overflow). Перепланирование
+                    // только освободит хороший слот и ухудшит итог.
+                    //
+                    // Пример: задача на 15 мин стоит в [13:20→13:35].
+                    //   newTarget = 13:50, jitStart = 13:35 = plannedEnd → ПРОПУСТИТЬ.
+                    //   Слот [13:35→13:50] занят overflow-задачей (которая и вызвала JIT).
+                    //
+                    // Перепланируем ТОЛЬКО если jitStart строго после plannedEnd —
+                    // тогда есть реальный зазор, который можно заполнить.
+                    int taskDuration = pt.getTemplate().getDurationMinutes();
+                    LocalDateTime jitStart = courseState.stableTargetEndTime
+                            .minusMinutes(taskDuration);
+
+                    if (!jitStart.isAfter(pt.getPlannedEndTime())) {
+                        log.debug("{}: JIT — задача #{} пропущена: jitStart={} ≤ plannedEnd={} " +
+                                        "(структурное переполнение, перестановка не улучшит результат)",
+                                agentId, plannedId, jitStart, pt.getPlannedEndTime());
+                        continue;
+                    }
+
                     tasksToReplan.add(plannedId);
                 }
             }
         }
 
+        // -----------------------------------------------------------------------
+        // Перепланирование найденных задач.
+        // -----------------------------------------------------------------------
         if (!tasksToReplan.isEmpty()) {
             log.info("{}: задача #{} задала новый дедлайн {}. " +
                             "Выравниваем {} ранее запланированных задач.",
@@ -579,37 +638,94 @@ public class OrderAgent extends BaseAgent {
 
             for (Long idToReplan : tasksToReplan) {
                 String taId = taskIdToAgentId.get(idToReplan);
-                if (taId != null) {
-                    // Шаг 1: отправляем CANCEL_AND_REPLAN — TaskAgent освобождает
-                    // слоты у повара и оборудования, сбрасывает своё состояние
-                    // и ждёт нового INIT.
-                    CancelAndReplanBody cancelPayload = new CancelAndReplanBody(
-                            idToReplan,
-                            times.notBefore,
-                            times.targetEndTime,
-                            times.deadline
-                    );
-                    send(taId, MessageType.CANCEL_AND_REPLAN, cancelPayload);
-
-                    // П1-ИЗМЕНЕНИЕ: сразу отправляем INIT вместо добавления в очередь.
-                    //
-                    // Раньше задача добавлялась в sortedTaskIdsToPlan и получала INIT
-                    // только когда до неё «доходила очередь» в planNextTaskInCurrentCourse().
-                    // Теперь INIT отправляется немедленно вслед за CANCEL_AND_REPLAN.
-                    //
-                    // Порядок в MessageBus гарантирует корректность: CANCEL_AND_REPLAN
-                    // будет обработан первым (TaskAgent освободит слоты), и только
-                    // затем INIT запустит новые переговоры.
-                    InitTaskPayload initPayload = new InitTaskPayload(
-                            times.notBefore,
-                            times.targetEndTime,
-                            times.deadline
-                    );
-                    send(taId, MessageType.INIT, initPayload);
+                if (taId == null) {
+                    log.warn("{}: JIT — нет агента для задачи #{}, пропускаем",
+                            agentId, idToReplan);
+                    continue;
                 }
 
-                // Сбрасываем задачу в БД.
+                // Загружаем задачу ДО очистки её полей: нам нужны assignedCook
+                // и assignedEquipmentType, чтобы снять конкретные слоты.
                 CookingTask pt = taskRepository.findById(idToReplan).orElseThrow();
+
+                // -----------------------------------------------------------
+                // ★ ИСПРАВЛЕНИЕ БАГА 2:
+                //   Синхронно снимаем слот из in-memory расписания повара
+                //   и оборудования — до отправки CANCEL_AND_REPLAN.
+                //
+                // Проблема (было):
+                //   CANCEL_AND_REPLAN уходил в очередь TaskAgent-у, тот
+                //   отправлял FREE_SLOT повару — тоже в очередь. Между
+                //   CANCEL_AND_REPLAN и фактическим удалением слота проходило
+                //   несколько шагов MessageBus. За это время TASK_547/TASK_548
+                //   (Овощи, параллельный раунд переговоров) видели повара
+                //   «занятым» и бронировали JIT-слот [12:49→12:59], дробя
+                //   окно [12:44→12:59] на два куска: 5 мин + 10 мин.
+                //   Перепланируемые 15-минутные задачи картофеля уже не
+                //   помещались ни в один из них и улетали на 13:09+.
+                //
+                // Решение (стало):
+                //   Прямой вызов removeSlotByTaskId() на объекте CookSchedule
+                //   через sceneAgent — как это делает triggerFullReschedule().
+                //   К моменту старта новых переговоров (INIT) расписание
+                //   уже содержит нужный свободный слот — гонки нет.
+                //
+                // Безопасность:
+                //   Когда TaskAgent позже обработает CANCEL_AND_REPLAN
+                //   и пошлёт FREE_SLOT, CookAgent вызовет removeSlotByTaskId
+                //   повторно. slots.removeIf() идемпотентен — вернёт false,
+                //   если слот уже удалён, без ошибок и побочных эффектов.
+                // -----------------------------------------------------------
+                if (pt.getAssignedCook() != null) {
+                    CookSchedule cookSchedule = sceneAgent.getCookSchedule(
+                            pt.getAssignedCook().getId());
+                    if (cookSchedule != null) {
+                        boolean removed = cookSchedule.removeSlotByTaskId(idToReplan);
+                        log.debug("{}: JIT — слот задачи #{} {} у COOK_{}",
+                                agentId, idToReplan,
+                                removed ? "синхронно снят" : "уже отсутствовал",
+                                pt.getAssignedCook().getId());
+                    }
+                }
+                if (pt.getAssignedEquipmentType() != null) {
+                    EquipmentTypeSchedule equipSchedule = sceneAgent.getEquipmentTypeSchedule(
+                            pt.getAssignedEquipmentType());
+                    if (equipSchedule != null) {
+                        equipSchedule.removeSlotByTaskId(idToReplan);
+                        log.debug("{}: JIT — слот оборудования задачи #{} снят (тип: {})",
+                                agentId, idToReplan, pt.getAssignedEquipmentType());
+                    }
+                }
+
+                // Отправляем CANCEL_AND_REPLAN: TaskAgent сбросит внутреннее
+                // состояние и пошлёт FREE_SLOT повару (безопасный no-op,
+                // поскольку слот уже снят синхронно выше).
+                CancelAndReplanBody cancelPayload = new CancelAndReplanBody(
+                        idToReplan,
+                        times.notBefore,
+                        times.targetEndTime,
+                        times.deadline
+                );
+                send(taId, MessageType.CANCEL_AND_REPLAN, cancelPayload);
+
+                // Сразу за CANCEL_AND_REPLAN — INIT для запуска новых переговоров.
+                // Порядок в однопоточном FIFO-MessageBus гарантирует корректность:
+                // CANCEL_AND_REPLAN будет обработан первым (TaskAgent сбросит
+                // состояние и отправит FREE_SLOT), и только затем INIT запустит
+                // новый раунд. FREE_SLOT придёт к повару позже, но его слот уже
+                // пуст — race condition исключён.
+                //
+                // notBefore = now(): слот освобождён синхронно выше, можно
+                // начинать переговоры немедленно.
+                InitTaskPayload initPayload = new InitTaskPayload(
+                        LocalDateTime.now(),
+                        times.targetEndTime,
+                        times.deadline
+                );
+                send(taId, MessageType.INIT, initPayload);
+
+                // Обнуляем запись в БД. Важно: делаем это ПОСЛЕ чтения
+                // assignedCook/assignedEquipmentType (выше), а не до.
                 pt.setStatus(PENDING);
                 pt.setPlannedStartTime(null);
                 pt.setPlannedEndTime(null);
@@ -617,7 +733,7 @@ public class OrderAgent extends BaseAgent {
                 pt.setAssignedEquipmentType(null);
                 taskRepository.save(pt);
 
-                // Убираем из запланированных — она снова в процессе торга.
+                // Убираем из запланированных — задача снова в процессе торга.
                 courseState.plannedTaskIds.remove(idToReplan);
 
                 log.debug("{}: задача #{} отправлена на JIT-перепланирование",
@@ -625,11 +741,9 @@ public class OrderAgent extends BaseAgent {
             }
         }
 
-        // П1-ИЗМЕНЕНИЕ: убран вызов planNextTaskInCurrentCourse().
-        //
-        // Раньше здесь запускалась следующая задача из очереди. Теперь очереди нет:
-        // все задачи уже запущены из planCurrentCourse(). Просто проверяем,
-        // завершён ли курс (все задачи получили TASK_PLANNED или TASK_FAILED).
+        // Проверяем завершённость курса.
+        // Все задачи уже запущены из planCurrentCourse() параллельно,
+        // очереди нет — просто считаем сколько пришло TASK_PLANNED/TASK_FAILED.
         checkCourseCompletion(courseState);
     }
 
@@ -964,6 +1078,11 @@ public class OrderAgent extends BaseAgent {
          * курса он остаётся true.
          */
         boolean firstPlanningDone = false;
+
+        /** Флаг: JIT-выравнивание уже срабатывало в этом цикле планирования.
+         *  После первого срабатывания блокируем повторные волны — переполненные
+         *  задачи принимаются в ASAP без дальнейшего каскада. */
+        boolean jitAlignmentFired = false;
 
         /** Стабильный целевой дедлайн курса. Обновляется только если задача
          *  подтвердила время позже текущей цели. ASAP-задачи его не двигают. */
